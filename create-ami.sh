@@ -131,5 +131,5 @@ if [[ ${S3UPLOAD} ==  "YES" ]]; then
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		-o "${AWS_ACCESS_KEY_ID}" \
 		-w "${AWS_SECRET_ACCESS_KEY}" \
-		-b ${_IMG}
+		-b ${_IMG##*/}
 fi
