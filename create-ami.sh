@@ -38,15 +38,17 @@ if [[ ${S3UPLOAD} ==  "YES" ]]; then
 		echo "${0##*/}: AWS credentials aren't set"
 		exit 1
 	fi
+	if ! type ec2-import-volume >/dev/null; then
+		echo "${0##*/}: needs the EC2 CLI tools"
+	fi
 fi
 
 set -e
 umask 022
 
 _WRKDIR=$(mktemp -d -p /tmp aws-ami.XXXXXXXXXX)
-_TS=$(date "+%s")
 _LOG=${_WRKDIR}/log
-_IMG=${_WRKDIR}/openbsd-${_TS}.img
+_IMG=${_WRKDIR}/img-openbsd-$(date "+%s")
 _MNT=${_WRKDIR}/mnt
 _REL=$(uname -r | tr -d '.')
 _VNDEV=$(doas vnconfig -l | grep 'not in use' | head -1 | cut -d ':' -f1)
@@ -59,12 +61,7 @@ fi
 mkdir -p ${_MNT}
 touch ${_LOG}
 
-_dlog()
-{
-	echo "**** ERROR"; cat ${_LOG}; exit 1
-}
-
-trap "_dlog" ERR
+trap "cat ${_LOG}" ERR
 
 echo "===> create image container"
 doas dd if=/dev/zero of=${_IMG} bs=1m count=1024 >${_LOG} 2>&1
@@ -120,10 +117,12 @@ echo
 rm -f ${_LOG}
 rmdir ${_MNT} || true
 
+trap - TERM
+
 if [[ ${S3UPLOAD} ==  "YES" ]]; then
 	echo "===> upload image to S3 and create volume (can take some time)"
 	ec2-import-volume \
-		${_IMG##*/} \
+		${_IMG} \
 		-f RAW \
 		--region ${AWS_REGION} \
 		-z ${AWS_AZ} \
@@ -132,5 +131,5 @@ if [[ ${S3UPLOAD} ==  "YES" ]]; then
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		-o "${AWS_ACCESS_KEY_ID}" \
 		-w "${AWS_SECRET_ACCESS_KEY}" \
-		-b openbsd-${_TS}
+		-b ${_IMG}
 fi
