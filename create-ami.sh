@@ -117,6 +117,7 @@ echo
 rm -f ${_LOG}
 rmdir ${_MNT} || true
 
+set +e
 trap - TERM
 
 if [[ ${S3UPLOAD} ==  "YES" ]]; then
