@@ -105,9 +105,9 @@ echo "tty com0" | doas tee -a ${_MNT}/etc/boot.conf 2>&1 >${_LOG}
 doas chroot ${_MNT} ln -sf /usr/share/zoneinfo/UTC /etc/localtime 2>&1 >${_LOG}
 doas chroot ${_MNT} ldconfig /usr/local/lib /usr/X11R6/lib 2>&1 >${_LOG}
 doas chroot ${_MNT} rcctl disable sndiod 2>&1 >${_LOG}
-doas umount ${_MNT} 2>&1 >${_LOG}
 
 echo "===> unmount the image"
+doas umount ${_MNT} 2>&1 >${_LOG}
 doas vnconfig -u ${_VNDEV} 2>&1 >${_LOG}
 
 echo "===> image available at:"
