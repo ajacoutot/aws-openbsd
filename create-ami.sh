@@ -105,6 +105,11 @@ rm ${_WRKDIR}/*${_REL}.tgz >${_LOG} 2>&1
 echo "===> create devices"
 ( cd ${_MNT}/dev && doas sh ./MAKEDEV all >${_LOG} 2>&1 )
 
+echo "===> store entropy for the initial boot"
+doas dd if=/dev/random of=${_MNT}/var/db/host.random bs=65536 count=1 status=none >${_LOG} 2>&1
+doas dd if=/dev/random of=${_MNT}/etc/random.seed bs=512 count=1 status=none >${_LOG} 2>&1
+doas chmod 600 ${_MNT}/var/db/host.random ${_MNT}/etc/random.seed >${_LOG} 2>&1
+
 echo "===> install master boot record"
 doas installboot -r ${_MNT} ${_VNDEV} >${_LOG} 2>&1
 
