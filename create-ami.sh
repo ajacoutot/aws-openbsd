@@ -16,6 +16,12 @@
 #
 # create a 1G OpenBSD AMI for AWS
 
+# XXX script vmm(4) to create an "official" installation instead of the extract dance
+# XXX ec2-delete-disk-image
+# XXX use env vars and knobs instead of editing the script
+# XXX function()alise
+# XXX make it possible to build a release image instead of a snap
+
 _ARCH=$(uname -m)
 
 ################################################################################
@@ -164,7 +170,7 @@ if [[ ${AWS_CREATE_AMI} ==  "YES" ]]; then
 	#echo
 	#echo "===> delete local and remote disk images"
 	rm -rf ${_WRKDIR}
-	#ec2-delete-disk-image ...XXX
+	#ec2-delete-disk-image
 
 	echo
 	echo "===> create snapshot (can take some time)"
