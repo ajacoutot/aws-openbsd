@@ -71,7 +71,7 @@ _REL=$(uname -r | tr -d '.')
 _VNDEV=$(doas vnconfig -l | grep 'not in use' | head -1 | cut -d ':' -f1)
 
 if [[ -z ${_VNDEV} ]]; then
-	echo "${0##*/}: \"$*\" vnd(4) device available"
+	echo "${0##*/}: no vnd(4) device available"
 	exit 1
 fi
 
