@@ -14,7 +14,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
-# create a 1G OpenBSD AMI for AWS
+# create an OpenBSD image and AMI for AWS
 
 # XXX script vmm(4) to create an "official" installation instead of the extract dance
 # XXX ec2-delete-disk-image
