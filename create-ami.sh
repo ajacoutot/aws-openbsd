@@ -60,7 +60,7 @@ usage() {
 
 create_img() {
 	_WRKDIR=$(mktemp -d -p /tmp aws-ami.XXXXXXXXXX)
-	_IMG=${_WRKDIR}/img-openbsd-$(date "+%s")
+	_IMG=${_WRKDIR}/openbsd-$(date "+%s")
 	local _LOG=${_WRKDIR}/log
 	local _MNT=${_WRKDIR}/mnt
 	local _REL=$(uname -r | tr -d '.')
@@ -189,14 +189,14 @@ create_ami(){
 	done
 
 	echo
-	echo "===> register new AMI: ${_IMG##*img-}"
+	echo "===> register new AMI: ${_IMG##*/}"
 	ec2-register \
-		-n ${_IMG##*img-} \
+		-n ${_IMG##*/} \
 		-O "${AWS_ACCESS_KEY_ID}" \
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		--region ${AWS_REGION} \
 		-a ${_ARCH} \
-		-d "OpenBSD-current $(uname -m) ${_IMG##*img-}" \
+		-d "OpenBSD-current $(uname -m) ${_IMG##*/}" \
 		--root-device-name /dev/sda1 \
 		--virtualization-type hvm \
 		-s ${_SNAP}
