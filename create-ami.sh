@@ -139,6 +139,10 @@ create_img() {
 }
 
 create_ami(){
+	local _IMGNAME=${_IMG##*/}
+	if ! ${CREATE_IMG}; then
+		_IMGNAME=${_IMGNAME}-$(date "+%s")
+	fi
 	echo "===> upload image to S3 (can take some time)"
 	ec2-import-volume \
 		${_IMG} \
@@ -146,12 +150,12 @@ create_ami(){
 		--region ${AWS_REGION} \
 		-z ${AWS_AZ} \
 		-s ${IMGSIZE} \
-		-d ${_IMG##*/} \
+		-d ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		-o "${AWS_ACCESS_KEY_ID}" \
 		-w "${AWS_SECRET_ACCESS_KEY}" \
-		-b ${_IMG##*/}
+		-b ${_IMGNAME}
 
 	echo
 	echo "===> convert image to volume (can take some time)"
@@ -160,7 +164,7 @@ create_ami(){
 			-O "${AWS_ACCESS_KEY_ID}" \
 			-W "${AWS_SECRET_ACCESS_KEY}" \
 			--region ${AWS_REGION} 2>/dev/null | \
-			grep "${_IMG##*/}" | \
+			grep "${_IMGNAME}" | \
 			grep -Eo "vol-[[:alnum:]]*") || true
 		sleep 10
 	done
@@ -176,27 +180,27 @@ create_ami(){
 	       -O "${AWS_ACCESS_KEY_ID}" \
 	       -W "${AWS_SECRET_ACCESS_KEY}" \
 		--region ${AWS_REGION} \
-		-d ${_IMG##*/} \
+		-d ${_IMGNAME} \
 		${_VOL}
 	while [[ -z ${_SNAP} ]]; do
 		_SNAP=$(ec2-describe-snapshots \
 			-O "${AWS_ACCESS_KEY_ID}" \
 			-W "${AWS_SECRET_ACCESS_KEY}" \
 			--region ${AWS_REGION} 2>/dev/null | \
-			grep "completed.*${_IMG##*/}" | \
+			grep "completed.*${_IMGNAME}" | \
 			grep -Eo "snap-[[:alnum:]]*") || true
 		sleep 10
 	done
 
 	echo
-	echo "===> register new AMI: ${_IMG##*/}"
+	echo "===> register new AMI: ${_IMGNAME}"
 	ec2-register \
-		-n ${_IMG##*/} \
+		-n ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		--region ${AWS_REGION} \
 		-a ${_ARCH} \
-		-d "OpenBSD-current $(uname -m) ${_IMG##*/}" \
+		-d "OpenBSD-current $(uname -m) ${_IMGNAME}" \
 		--root-device-name /dev/sda1 \
 		--virtualization-type hvm \
 		-s ${_SNAP}
