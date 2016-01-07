@@ -115,6 +115,12 @@ create_img() {
 	echo "===> install master boot record"
 	doas installboot -r ${_MNT} ${_VNDEV} >${_LOG} 2>&1
 
+	echo "fetch and add cloud-init to rc.firsttime"
+	doas ftp -MV -o ${_MNT}/usr/local/libexec/cloud-init \
+		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/cloud-init.sh
+	doas chmod 0555 ${_MNT}/usr/local/libexec/cloud-init
+	echo "/usr/local/libexec/cloud-init firstboot"  | doas tree ${_MNT}/etc/rc.firsttime
+
 	echo "===> configure the image"
 	echo "/dev/wd0a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
