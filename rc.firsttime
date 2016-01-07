@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# Copyright (c) 2015 Reyk Floeter <reyk@openbsd.org>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+#
+# Very basic init script for OpenBSD running in Amazon AWS EC2 instances.
+#
+
+EC2_URL=http://169.254.169.254/latest/meta-data
+
+#
+# From OpenBSD's installer, shouldn't be needed in EC2
+#
+/usr/sbin/fw_update -v
+
+#
+# Allow users to fetch the SSH fingerprints from the console log
+#
+echo "local ssh host key fingerprints:"
+for i in /etc/ssh/ssh_host_*.pub; do
+	ssh-keygen -l -f $i
+done
+
+#
+# Get information from the EC2 meta-data
+#
+ec2_metadata() {
+	echo -n "ec2 instance type: " 
+	EC2_TYPE=$(ftp -V -o - ${EC2_URL}/instance-type)
+	if [ -z ${EC2_TYPE} ]; then
+		echo "failed"
+	else
+		echo ${EC2_TYPE}
+	fi
+
+	echo -n "ec2 public key: "
+	PUBKEYS=/root/.ssh/authorized_keys
+	ftp -V -o $PUBKEYS ${EC2_URL}/public-keys/0/openssh-key
+	test -s $PUBKEYS && ssh-keygen -l -f $PUBKEYS
+
+	echo -n "ec2 public hostname: "
+	EC2_HOSTNAME=$(ftp -V -o - ${EC2_URL}/public-hostname)
+	if [ -z ${EC2_HOSTNAME} ]; then
+		echo "failed"
+	else
+		echo ${EC2_HOSTNAME}
+	fi
+}
+
+# First check if we got a default route
+if ifconfig egress >/dev/null 2>&1; then
+	ec2_metadata
+	echo "ec2 init: done"
+else
+	echo "ec2 init: failed"
+fi
