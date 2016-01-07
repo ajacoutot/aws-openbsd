@@ -125,6 +125,19 @@ create_img() {
 	doas chroot ${_MNT} ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
 	doas chroot ${_MNT} rcctl disable sndiod >${_LOG} 2>&1
 
+	echo "===> remove cruft from the image"
+	#doas rm /etc/random.seed /var/db/host.random
+	doas rm ${_MNT}/etc/isakmpd/private/local.key \
+		${_MNT}/etc/isakmpd/local.pub \
+		${_MNT}/etc/iked/private/local.key \
+		${_MNT}/etc/isakmpd/local.pub \
+		${_MNT}/etc/ssh/ssh_host_* \
+		${_MNT}/var/db/dhclient.leases.* 2>&1
+	doas rm -rf ${_MNT}/tmp/{.[!.],}* 2>&1
+
+	echo "===> disable root password"
+	doas chroot ${_MNT} chpass -a 'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh' 2>&1
+
 	echo "===> unmount the image"
 	doas umount ${_MNT} >${_LOG} 2>&1
 	doas vnconfig -u ${_VNDEV} >${_LOG} 2>&1
