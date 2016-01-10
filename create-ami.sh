@@ -133,7 +133,7 @@ create_img() {
 
 	echo "===> remove cruft from the image"
 	#doas rm /etc/random.seed /var/db/host.random
-	doas rm ${_MNT}/etc/isakmpd/private/local.key \
+	doas rm -f ${_MNT}/etc/isakmpd/private/local.key \
 		${_MNT}/etc/isakmpd/local.pub \
 		${_MNT}/etc/iked/private/local.key \
 		${_MNT}/etc/isakmpd/local.pub \
