@@ -119,7 +119,7 @@ create_img() {
 	doas ftp -MV -o ${_MNT}/usr/local/libexec/cloud-init \
 		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/cloud-init.sh
 	doas chmod 0555 ${_MNT}/usr/local/libexec/cloud-init
-	echo "/usr/local/libexec/cloud-init firstboot"  | doas tree ${_MNT}/etc/rc.firsttime
+	echo "/usr/local/libexec/cloud-init firstboot"  | doas tee ${_MNT}/etc/rc.firsttime
 
 	echo "===> configure the image"
 	echo "/dev/wd0a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
