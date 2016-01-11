@@ -111,7 +111,7 @@ create_img() {
 	echo "===> install and add cloud-init to /etc/rc"
 	doas install -m 0555 -o root -g bin ${_WRKDIR}/cloud-init \
 		${_MNT}/usr/libexec/cloud-init >${_LOG} 2>&1
-	doas sed "s,^make_keys$,/usr/libexec/cloud-init ; &,g" ${_MNT}/etc/rc
+	doas sed -i "s,^make_keys$,/usr/libexec/cloud-init ; &,g" ${_MNT}/etc/rc
 
 	echo "===> remove downloaded files"
 	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/cloud-init >${_LOG} 2>&1
