@@ -78,7 +78,7 @@ case ${1} in
 		ec2_hostname
 		ec2_userdata
 		ec2_fingerprints
-		sed -i "/^!\/usr\/libexec\/cloud-init/d" /etc/rc.securelevel
+		sed -i "/^\/usr\/libexec\/cloud-init/d" /etc/rc.securelevel
 		if [[ ! -s /etc/rc.securelevel ]]; then
 			rm /etc/rc.securelevel
 		fi
