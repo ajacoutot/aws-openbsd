@@ -21,10 +21,11 @@
 # * run the following command to add cloud-init to /etc/rc:
 #   sed -i "s,^make_keys$,/usr/libexec/cloud-init ; &,g" /etc/rc
 
+echo "WIP, do not use!"
+exit 1
+
 ec2_fingerprints()
 {
-	( while ! pgrep -q -xf "/usr/sbin/sshd"; do sleep 1; done
-	echo
 	logger -s -t ec2 <<EOF
 #############################################################
 -----BEGIN SSH HOST KEY FINGERPRINTS-----
@@ -32,7 +33,6 @@ $(for _f in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf ${_f}; done)
 -----END SSH HOST KEY FINGERPRINTS-----
 #############################################################
 EOF
-	) &
 }
 
 ec2_hostname()
@@ -65,10 +65,19 @@ mock()
 	ftp -MVo - http://169.254.169.254/latest/${1} 2>/dev/null || return
 }
 
+mockavail() {
+	while [[ -z $(mock meta-data/mac) ]]; do
+		sleep 1
+		[ $((i++)) -ge 10 ] && return 1
+	done
+}
+
 usage()
 {
 	echo "usage: ${0##*/} cloudinit|firstboot" >&2; exit 1
 }
+
+mockavail || exit
 
 case ${1} in
 	cloudinit)
