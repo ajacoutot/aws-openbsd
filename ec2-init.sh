@@ -73,9 +73,13 @@ case ${1} in
 		# XXX TODO
 		exit 0 ;;
 	firstboot)
-		[[ -n "${INRC}" ]] && print -- \
+		if [[ -n "${INRC}" ]]; then
+			sed -i "/^!\/usr\/local\/libexec\/ec2-init/d" \
+				/etc/hostname.xnf0
+			print -- \
 			"pass out proto tcp from any to 169.254.169.254 port www keep state" | \
 			pfctl -f -
+		fi
 		ec2_pubkey
 		ec2_hostname
 		ec2_userdata
