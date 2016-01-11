@@ -22,6 +22,9 @@
 # XXX function()alise
 # XXX make it possible to build a release image instead of a snap
 
+echo "WIP, do not use!"
+exit 1
+
 _ARCH=$(uname -m)
 
 ################################################################################
