@@ -17,9 +17,9 @@
 #
 # AWS cloud-init helper for OpenBSD
 # =================================
-# Install as /usr/libexec/cloud-init; add the following to /etc/rc.securelevel:
-# /usr/libexec/cloud-init firstboot
-#
+# * install as /usr/libexec/cloud-init
+# * run the following command to add cloud-init to /etc/rc:
+#   sed -i "s,^make_keys$,/usr/libexec/cloud-init ; &,g" /etc/rc
 
 ec2_fingerprints()
 {
