@@ -127,6 +127,7 @@ create_img() {
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
+	doas chmod 0640 ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 	doas chroot ${_MNT} ln -sf /usr/share/zoneinfo/UTC /etc/localtime >${_LOG} 2>&1
 	doas chroot ${_MNT} ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
 	doas chroot ${_MNT} rcctl disable sndiod >${_LOG} 2>&1
