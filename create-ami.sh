@@ -108,11 +108,10 @@ create_img() {
 	doas mv ${_MNT}/bsd.mp ${_MNT}/bsd >${_LOG} 2>&1
 	doas chown 0:0 ${_MNT}/bsd* >${_LOG} 2>&1
 
-	echo "===> install and add cloud-init to rc.securelevel"
-	install -m 0555 -o root -g bin ${_WRKDIR}/cloud-init \
+	echo "===> install and add cloud-init to /etc/rc"
+	doas install -m 0555 -o root -g bin ${_WRKDIR}/cloud-init \
 		${_MNT}/usr/libexec/cloud-init >${_LOG} 2>&1
-	echo "/usr/libexec/cloud-init firstboot" | \
-		doas tee ${_MNT}/etc/rc.securelevel >${_LOG} 2>&1
+	doas sed "s,^make_keys$,/usr/libexec/cloud-init ; &,g" ${_MNT}/etc/rc
 
 	echo "===> remove downloaded files"
 	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/cloud-init >${_LOG} 2>&1
