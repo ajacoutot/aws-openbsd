@@ -35,7 +35,9 @@ EOF
 
 ec2_hostname()
 {
-	echo "$(mock meta-data/local-hostname)" >/etc/myname
+	local _hostname="$(mock meta-data/local-hostname)"
+	hostname ${_hostname}
+	echo ${_hostname} >/etc/myname
 }
 
 ec2_pubkey()
