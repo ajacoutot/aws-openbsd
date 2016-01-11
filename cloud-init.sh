@@ -17,13 +17,13 @@
 #
 # AWS cloud-init helper for OpenBSD
 # =================================
-# Install as /usr/local/libexec/cloud-init and add this to /etc/rc.firsttime:
-# /usr/local/libexec/cloud-init firstboot
+# Install as /usr/libexec/cloud-init; add the following to /etc/rc.securelevel:
+# /usr/libexec/cloud-init firstboot
 #
 
 ec2_fingerprints()
 {
-	local _f
+	( while ! pgrep -qf "^/usr/libexec/getty "; do sleep 1; done
 	logger -s -t ec2 <<EOF
 #############################################################
 -----BEGIN SSH HOST KEY FINGERPRINTS-----
@@ -31,6 +31,7 @@ $(for _f in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf ${_f}; done)
 -----END SSH HOST KEY FINGERPRINTS-----
 #############################################################
 EOF
+	) &
 }
 
 ec2_hostname()
@@ -77,6 +78,10 @@ case ${1} in
 		ec2_hostname
 		ec2_userdata
 		ec2_fingerprints
+		sed -i "/^!\/usr\/libexec\/cloud-init/d" /etc/rc.securelevel
+		if [[ ! -s /etc/rc.securelevel ]]; then
+			rm /etc/rc.securelevel
+		fi
 		;;
 	*)
 		usage ;;
