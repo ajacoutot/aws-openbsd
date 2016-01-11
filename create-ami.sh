@@ -77,7 +77,8 @@ create_img() {
 	trap "cat ${_LOG}" ERR
 
 	echo "===> create image container"
-	doas dd if=/dev/zero of=${_IMG} bs=1m count=$((${IMGSIZE}*1024)) >${_LOG} 2>&1
+	doas dd if=/dev/zero of=${_IMG} bs=1m count=$((${IMGSIZE}*1024)) \
+		>${_LOG} 2>&1
 
 	echo "===> create image filesystem"
 	doas vnconfig ${_VNDEV} ${_IMG} >${_LOG} 2>&1
@@ -92,8 +93,14 @@ create_img() {
 	( cd ${_WRKDIR} && \
 		ftp -V ${MIRROR}/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} >${_LOG} 2>&1 )
 
+	echo "===> fetch cloud-init"
+	ftp -MV -o ${_WRKDIR}/cloud-init \
+		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/cloud-init.sh
+
 	echo "===> extract sets"
-	for i in ${_WRKDIR}/*${_REL}.tgz ${_MNT}/var/sysmerge/{,x}etc.tgz; do doas tar xzphf $i -C ${_MNT} >${_LOG} 2>&1; done
+	for i in ${_WRKDIR}/*${_REL}.tgz ${_MNT}/var/sysmerge/{,x}etc.tgz; do \
+		doas tar xzphf $i -C ${_MNT} >${_LOG} 2>&1
+	done
 
 	echo "===> install MP kernel"
 	doas mv ${_WRKDIR}/bsd* ${_MNT} >${_LOG} 2>&1
@@ -101,25 +108,28 @@ create_img() {
 	doas mv ${_MNT}/bsd.mp ${_MNT}/bsd >${_LOG} 2>&1
 	doas chown 0:0 ${_MNT}/bsd* >${_LOG} 2>&1
 
+	echo "===> install and add cloud-init to rc.securelevel"
+	install -m 0555 -o root -g bin ${_WRKDIR}/cloud-init \
+		${_MNT}/usr/libexec/cloud-init >${_LOG} 2>&1
+	echo "/usr/libexec/cloud-init firstboot" | \
+		doas tee ${_MNT}/etc/rc.securelevel >${_LOG} 2>&1
+
 	echo "===> remove downloaded files"
-	rm ${_WRKDIR}/*${_REL}.tgz >${_LOG} 2>&1
+	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/cloud-init >${_LOG} 2>&1
 
 	echo "===> create devices"
 	( cd ${_MNT}/dev && doas sh ./MAKEDEV all >${_LOG} 2>&1 )
 
 	echo "===> store entropy for the initial boot"
-	doas dd if=/dev/random of=${_MNT}/var/db/host.random bs=65536 count=1 status=none >${_LOG} 2>&1
-	doas dd if=/dev/random of=${_MNT}/etc/random.seed bs=512 count=1 status=none >${_LOG} 2>&1
-	doas chmod 600 ${_MNT}/var/db/host.random ${_MNT}/etc/random.seed >${_LOG} 2>&1
+	doas dd if=/dev/random of=${_MNT}/var/db/host.random bs=65536 count=1 \
+		status=none >${_LOG} 2>&1
+	doas dd if=/dev/random of=${_MNT}/etc/random.seed bs=512 count=1 \
+		status=none >${_LOG} 2>&1
+	doas chmod 600 ${_MNT}/var/db/host.random ${_MNT}/etc/random.seed \
+		>${_LOG} 2>&1
 
 	echo "===> install master boot record"
 	doas installboot -r ${_MNT} ${_VNDEV} >${_LOG} 2>&1
-
-	echo "fetch and add cloud-init to rc.firsttime"
-	doas ftp -MV -o ${_MNT}/usr/local/libexec/cloud-init \
-		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/cloud-init.sh
-	doas chmod 0555 ${_MNT}/usr/local/libexec/cloud-init
-	echo "/usr/local/libexec/cloud-init firstboot"  | doas tee ${_MNT}/etc/rc.firsttime
 
 	echo "===> configure the image"
 	echo "/dev/wd0a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
@@ -128,7 +138,8 @@ create_img() {
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 	doas chmod 0640 ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
-	doas chroot ${_MNT} ln -sf /usr/share/zoneinfo/UTC /etc/localtime >${_LOG} 2>&1
+	doas chroot ${_MNT} ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
+		>${_LOG} 2>&1
 	doas chroot ${_MNT} ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
 	doas chroot ${_MNT} rcctl disable sndiod >${_LOG} 2>&1
 
@@ -143,7 +154,8 @@ create_img() {
 	doas rm -rf ${_MNT}/tmp/{.[!.],}* 2>&1
 
 	echo "===> disable root password"
-	doas chroot ${_MNT} chpass -a 'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh' 2>&1
+	doas chroot ${_MNT} chpass -a \
+		'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh' 2>&1
 
 	echo "===> unmount the image"
 	doas umount ${_MNT} >${_LOG} 2>&1
