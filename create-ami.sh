@@ -21,9 +21,7 @@
 # XXX use env vars and knobs instead of editing the script
 # XXX function()alise
 # XXX make it possible to build a release image instead of a snap
-
-echo "WIP, do not use!"
-exit 1
+# XXX /etc/hostname.ix0
 
 _ARCH=$(uname -m)
 
@@ -96,9 +94,9 @@ create_img() {
 	( cd ${_WRKDIR} && \
 		ftp -V ${MIRROR}/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} >${_LOG} 2>&1 )
 
-	echo "===> fetch cloud-init"
-	ftp -MV -o ${_WRKDIR}/cloud-init \
-		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/cloud-init.sh
+	echo "===> fetch ec2-init"
+	ftp -MV -o ${_WRKDIR}/ec2-init \
+		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
 
 	echo "===> extract sets"
 	for i in ${_WRKDIR}/*${_REL}.tgz ${_MNT}/var/sysmerge/{,x}etc.tgz; do \
@@ -111,13 +109,15 @@ create_img() {
 	doas mv ${_MNT}/bsd.mp ${_MNT}/bsd >${_LOG} 2>&1
 	doas chown 0:0 ${_MNT}/bsd* >${_LOG} 2>&1
 
-	echo "===> install and add cloud-init to /etc/rc"
-	doas install -m 0555 -o root -g bin ${_WRKDIR}/cloud-init \
-		${_MNT}/usr/libexec/cloud-init >${_LOG} 2>&1
-	doas sed -i "s,^make_keys$,/usr/libexec/cloud-init ; &,g" ${_MNT}/etc/rc
+	echo "===> install and add ec2-init to /etc/rc"
+	doas install -m 0555 -o root -g bin ${_WRKDIR}/ec2-init \
+		${_MNT}/usr/local/libexec/ec2-init >${_LOG} 2>&1
+	echo "!/usr/local/libexec/ec2-init firstboot" | \
+		tee -a /etc/hostname.xnf0
+	doas sed -i "s,^make_keys$,/usr/libexec/ec2-init ; &,g" ${_MNT}/etc/rc
 
 	echo "===> remove downloaded files"
-	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/cloud-init >${_LOG} 2>&1
+	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/ec2-init >${_LOG} 2>&1
 
 	echo "===> create devices"
 	( cd ${_MNT}/dev && doas sh ./MAKEDEV all >${_LOG} 2>&1 )
