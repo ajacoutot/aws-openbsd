@@ -23,7 +23,8 @@
 
 ec2_fingerprints()
 {
-	( while ! pgrep -qf "^/usr/libexec/getty "; do sleep 1; done
+	( while ! pgrep -q -xf "/usr/sbin/sshd"; do sleep 1; done
+	echo
 	logger -s -t ec2 <<EOF
 #############################################################
 -----BEGIN SSH HOST KEY FINGERPRINTS-----
@@ -78,10 +79,7 @@ case ${1} in
 		ec2_hostname
 		ec2_userdata
 		ec2_fingerprints
-		sed -i "/^\/usr\/libexec\/cloud-init/d" /etc/rc.securelevel
-		if [[ ! -s /etc/rc.securelevel ]]; then
-			rm /etc/rc.securelevel
-		fi
+		sed -i "/^\/usr\/libexec\/cloud-init/d" /etc/rc
 		;;
 	*)
 		usage ;;
