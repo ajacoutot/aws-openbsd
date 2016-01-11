@@ -17,15 +17,12 @@
 #
 # AWS cloud-init helper for OpenBSD
 # =================================
-# * install as /usr/libexec/cloud-init
-# * run the following command to add cloud-init to /etc/rc:
-#   sed -i "s,^make_keys$,/usr/libexec/cloud-init ; &,g" /etc/rc
-
-echo "WIP, do not use!"
-exit 1
+# Install as /usr/local/libexec/cloud-init and append to /etc/hostname.xnf0:
+# !/usr/local/libexec/cloud-init firstboot
 
 ec2_fingerprints()
 {
+	( while ! pgrep -q -xf "/usr/sbin/sshd"; do sleep 1; done
 	logger -s -t ec2 <<EOF
 #############################################################
 -----BEGIN SSH HOST KEY FINGERPRINTS-----
@@ -33,6 +30,7 @@ $(for _f in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf ${_f}; done)
 -----END SSH HOST KEY FINGERPRINTS-----
 #############################################################
 EOF
+	) &
 }
 
 ec2_hostname()
@@ -65,30 +63,24 @@ mock()
 	ftp -MVo - http://169.254.169.254/latest/${1} 2>/dev/null || return
 }
 
-mockavail() {
-	while [[ -z $(mock meta-data/mac) ]]; do
-		sleep 1
-		[ $((i++)) -ge 10 ] && return 1
-	done
-}
-
 usage()
 {
 	echo "usage: ${0##*/} cloudinit|firstboot" >&2; exit 1
 }
-
-mockavail || exit
 
 case ${1} in
 	cloudinit)
 		# XXX TODO
 		exit 0 ;;
 	firstboot)
+		[[ -n "${INRC}" ]] && print -- \
+			"pass out proto tcp from any to 169.254.169.254 port www keep state" | \
+			pfctl -f -
 		ec2_pubkey
 		ec2_hostname
 		ec2_userdata
 		ec2_fingerprints
-		sed -i "/^\/usr\/libexec\/cloud-init/d" /etc/rc
+		[[ -n "${INRC}" ]] && print -- "" | pfctl -f -
 		;;
 	*)
 		usage ;;
