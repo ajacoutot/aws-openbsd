@@ -64,7 +64,7 @@ mock()
 	[[ -n ${1} ]] || return
 	local _ret
 	_ret=$(ftp -MVo - http://169.254.169.254/latest/${1} 2>/dev/null) || return
-	[[ -n ${_ret} ]] && print -- ${_ret} || return
+	[[ -n ${_ret} ]] && print -- "${_ret}" || return
 }
 
 mock_pf()
