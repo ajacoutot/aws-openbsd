@@ -113,7 +113,7 @@ create_img() {
 	doas install -m 0555 -o root -g bin ${_WRKDIR}/ec2-init \
 		${_MNT}/usr/local/libexec/ec2-init >${_LOG} 2>&1
 	echo "!/usr/local/libexec/ec2-init firstboot" | \
-		tee -a /etc/hostname.xnf0 >${_LOG} 2>&1
+		doas tee -a /etc/hostname.xnf0 >${_LOG} 2>&1
 
 	echo "===> remove downloaded files"
 	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/ec2-init >${_LOG} 2>&1
