@@ -139,7 +139,7 @@ create_img() {
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 	doas chmod 0640 ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
-	echo "127.0.0.1\tlocalhost" | doas tee >${_MNT}/etc/hosts
+	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts
 	echo "::1\t\tlocalhost" | doas tee -a ${_MNT}/etc/hosts
 	doas chroot ${_MNT} ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
 		>${_LOG} 2>&1
