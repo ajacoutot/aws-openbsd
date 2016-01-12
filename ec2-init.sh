@@ -69,7 +69,8 @@ mock()
 
 mock_pf()
 {
-	[[ -z ${INRC} || ! $(rcctl get pf status) ]] && return
+	[[ -z ${INRC} ]] && return
+	rcctl get pf status || return 0
 	case ${1} in
 		open)
 			print -- \
