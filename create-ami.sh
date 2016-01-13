@@ -114,7 +114,7 @@ create_img() {
 	doas install -m 0555 -o root -g bin ${_WRKDIR}/ec2-init \
 		${_MNT}/usr/local/libexec/ec2-init >${_LOG} 2>&1
 	echo "!/usr/local/libexec/ec2-init firstboot" | \
-		doas tee -a /etc/hostname.xnf0 >${_LOG} 2>&1
+		doas tee -a ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 
 	echo "===> remove downloaded files"
 	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/ec2-init >${_LOG} 2>&1
@@ -140,8 +140,8 @@ create_img() {
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 	doas chmod 0640 ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
-	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts
-	echo "::1\t\tlocalhost" | doas tee -a ${_MNT}/etc/hosts
+	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts 2>&1
+	echo "::1\t\tlocalhost" | doas tee -a ${_MNT}/etc/hosts 2>&1
 	doas chroot ${_MNT} ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
 		>${_LOG} 2>&1
 	doas chroot ${_MNT} ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
