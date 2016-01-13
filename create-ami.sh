@@ -34,6 +34,7 @@ AWS_AZ=eu-west-1a
 
 IMGSIZE=1 # GB
 MIRROR=http://ftp.fr.openbsd.org/pub/OpenBSD/snapshots/${_ARCH}
+TIMESTAMP=$(date "+%Y%m%d%H%M")
 
 ################################################################################
 
@@ -61,7 +62,7 @@ usage() {
 
 create_img() {
 	_WRKDIR=$(mktemp -d -p /tmp aws-ami.XXXXXXXXXX)
-	_IMG=${_WRKDIR}/openbsd-$(date "+%s")
+	_IMG=${_WRKDIR}/openbsd-$TIMESTAMP
 	local _LOG=${_WRKDIR}/log
 	local _MNT=${_WRKDIR}/mnt
 	local _REL=$(uname -r | tr -d '.')
@@ -176,7 +177,7 @@ create_img() {
 create_ami(){
 	local _IMGNAME=${_IMG##*/}
 	if ! ${CREATE_IMG}; then
-		_IMGNAME=${_IMGNAME}-$(date "+%s")
+		_IMGNAME=${_IMGNAME}-$TIMESTAMP
 	fi
 	echo "===> upload image to S3 (can take some time)"
 	ec2-import-volume \
