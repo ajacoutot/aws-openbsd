@@ -50,10 +50,10 @@ ec2_pubkey()
 	print -- "${_pubkey}" >>/root/.ssh/authorized_keys || return
 }
 
-# XXX only handles scripts for now
 ec2_userdata()
 {
 	local _userdata="$(mock user-data)" || return
+	[[ ${_userdata%${_userdata#??}} == "#!" ]] || return 0
 	local _script="$(mktemp -p /tmp -t aws-user-data.XXXXXXXXXX)" || return
 	print -- "${_userdata}" >${_script} && chmod u+x ${_script} && \
 		/bin/sh -c ${_script} && rm ${_script} || return
