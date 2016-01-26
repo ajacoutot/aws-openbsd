@@ -29,11 +29,12 @@ _ARCH=$(uname -m)
 
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-AWS_REGION=eu-west-1
-AWS_AZ=eu-west-1a
+AWS_REGION=${AWS_REGION-eu-west-1}
+AWS_AZ=${AWS_AZ-eu-west-1a}
 
 IMGSIZE=1 # GB
-MIRROR=http://ftp.fr.openbsd.org/pub/OpenBSD/snapshots/${_ARCH}
+MIRROR_HOST=${MIRROR_HOST-ftp.fr.openbsd.org}
+MIRROR=http://${MIRROR_HOST}/pub/OpenBSD/snapshots/${_ARCH}
 TIMESTAMP=$(date "+%Y%m%d%H%M")
 
 ################################################################################
