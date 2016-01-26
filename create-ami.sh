@@ -22,6 +22,7 @@
 # XXX function()alise
 # XXX make it possible to build a release image instead of a snap
 # XXX /etc/hostname.ix0
+# XXX date +%FT%T%z
 
 _ARCH=$(uname -m)
 
