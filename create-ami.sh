@@ -111,11 +111,9 @@ create_img() {
 	doas mv ${_MNT}/bsd.mp ${_MNT}/bsd >${_LOG} 2>&1
 	doas chown 0:0 ${_MNT}/bsd* >${_LOG} 2>&1
 
-	echo "===> install and add ec2-init to /etc/hostname.if(5)"
+	echo "===> install and add ec2-init"
 	doas install -m 0555 -o root -g bin ${_WRKDIR}/ec2-init \
 		${_MNT}/usr/local/libexec/ec2-init >${_LOG} 2>&1
-	echo "!/usr/local/libexec/ec2-init firstboot" | \
-		doas tee -a ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 
 	echo "===> remove downloaded files"
 	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/ec2-init >${_LOG} 2>&1
@@ -140,9 +138,11 @@ create_img() {
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
+	echo "!/usr/local/libexec/ec2-init firstboot" | \
+		doas tee -a ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 	doas chmod 0640 ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
-	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts 2>&1
-	echo "::1\t\tlocalhost" | doas tee -a ${_MNT}/etc/hosts 2>&1
+	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts >${_LOG} 2>&1
+	echo "::1\t\tlocalhost" | doas tee -a ${_MNT}/etc/hosts >${_LOG} 2>&1
 	doas chroot ${_MNT} ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
 		>${_LOG} 2>&1
 	doas chroot ${_MNT} ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
@@ -155,12 +155,12 @@ create_img() {
 		${_MNT}/etc/iked/private/local.key \
 		${_MNT}/etc/isakmpd/local.pub \
 		${_MNT}/etc/ssh/ssh_host_* \
-		${_MNT}/var/db/dhclient.leases.* 2>&1
-	doas rm -rf ${_MNT}/tmp/{.[!.],}* 2>&1
+		${_MNT}/var/db/dhclient.leases.* >${_LOG} 2>&1
+	doas rm -rf ${_MNT}/tmp/{.[!.],}* >${_LOG} 2>&1
 
 	echo "===> disable root password"
 	doas chroot ${_MNT} chpass -a \
-		'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh' 2>&1
+		'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh' >${_LOG} 2>&1
 
 	echo "===> unmount the image"
 	doas umount ${_MNT} >${_LOG} 2>&1
