@@ -22,7 +22,6 @@
 # XXX function()alise
 # XXX make it possible to build a release image instead of a snap
 # XXX /etc/hostname.ix0
-# XXX date +%FT%T%z
 
 _ARCH=$(uname -m)
 
@@ -36,7 +35,7 @@ AWS_AZ=${AWS_AZ-eu-west-1a}
 IMGSIZE=1 # GB
 MIRROR_HOST=${MIRROR_HOST-ftp.fr.openbsd.org}
 MIRROR=http://${MIRROR_HOST}/pub/OpenBSD/snapshots/${_ARCH}
-TIMESTAMP=$(date "+%Y%m%d%H%M")
+TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 
 ################################################################################
 
@@ -178,6 +177,8 @@ create_img() {
 
 create_ami(){
 	local _IMGNAME=${_IMG##*/}
+	local _BUCKETNAME=${_IMGNAME}
+	typeset -l _BUCKETNAME
 	if ! ${CREATE_IMG}; then
 		_IMGNAME=${_IMGNAME}-$TIMESTAMP
 	fi
@@ -193,7 +194,7 @@ create_ami(){
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		-o "${AWS_ACCESS_KEY_ID}" \
 		-w "${AWS_SECRET_ACCESS_KEY}" \
-		-b ${_IMGNAME}
+		-b ${_BUCKETNAME}
 
 	echo
 	echo "===> convert image to volume (can take some time)"
