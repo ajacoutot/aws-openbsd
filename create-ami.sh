@@ -79,49 +79,49 @@ create_img() {
 
 	trap "cat ${_LOG}" ERR
 
-	echo "===> create image container"
+	echo "===> creating image container"
 	doas dd if=/dev/zero of=${_IMG} bs=1m count=$((${IMGSIZE}*1024)) \
 		>${_LOG} 2>&1
 
-	echo "===> create image filesystem"
+	echo "===> creating image filesystem"
 	doas vnconfig ${_VNDEV} ${_IMG} >${_LOG} 2>&1
 	doas fdisk -iy ${_VNDEV} >${_LOG} 2>&1
 	printf "a\n\n\n\n\nq\n\n" | doas disklabel -E ${_VNDEV} >${_LOG} 2>&1
 	doas newfs /dev/r${_VNDEV}a >${_LOG} 2>&1
 
-	echo "===> mount image"
+	echo "===> mounting image"
 	doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
 
-	echo "===> fetch sets (can take some time)"
+	echo "===> fetching sets (can take some time)"
 	( cd ${_WRKDIR} && \
 		ftp -V ${MIRROR}/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} >${_LOG} 2>&1 )
 
-	echo "===> fetch ec2-init"
+	echo "===> fetching ec2-init"
 	ftp -MV -o ${_WRKDIR}/ec2-init \
 		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
 
-	echo "===> extract sets"
+	echo "===> extracting sets"
 	for i in ${_WRKDIR}/*${_REL}.tgz ${_MNT}/var/sysmerge/{,x}etc.tgz; do \
 		doas tar xzphf $i -C ${_MNT} >${_LOG} 2>&1
 	done
 
-	echo "===> install MP kernel"
+	echo "===> installing MP kernel"
 	doas mv ${_WRKDIR}/bsd* ${_MNT} >${_LOG} 2>&1
 	doas mv ${_MNT}/bsd ${_MNT}/bsd.sp >${_LOG} 2>&1
 	doas mv ${_MNT}/bsd.mp ${_MNT}/bsd >${_LOG} 2>&1
 	doas chown 0:0 ${_MNT}/bsd* >${_LOG} 2>&1
 
-	echo "===> install and add ec2-init"
+	echo "===> installing ec2-init"
 	doas install -m 0555 -o root -g bin ${_WRKDIR}/ec2-init \
 		${_MNT}/usr/local/libexec/ec2-init >${_LOG} 2>&1
 
-	echo "===> remove downloaded files"
+	echo "===> removing downloaded files"
 	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/ec2-init >${_LOG} 2>&1
 
-	echo "===> create devices"
+	echo "===> creating devices"
 	( cd ${_MNT}/dev && doas sh ./MAKEDEV all >${_LOG} 2>&1 )
 
-	echo "===> store entropy for the initial boot"
+	echo "===> storing entropy for the initial boot"
 	doas dd if=/dev/random of=${_MNT}/var/db/host.random bs=65536 count=1 \
 		status=none >${_LOG} 2>&1
 	doas dd if=/dev/random of=${_MNT}/etc/random.seed bs=512 count=1 \
@@ -129,10 +129,10 @@ create_img() {
 	doas chmod 600 ${_MNT}/var/db/host.random ${_MNT}/etc/random.seed \
 		>${_LOG} 2>&1
 
-	echo "===> install master boot record"
+	echo "===> installing master boot record"
 	doas installboot -r ${_MNT} ${_VNDEV} >${_LOG} 2>&1
 
-	echo "===> configure the image"
+	echo "===> configuring the image"
 	echo "/dev/wd0a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
@@ -148,7 +148,8 @@ create_img() {
 	doas chroot ${_MNT} ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
 	doas chroot ${_MNT} rcctl disable sndiod >${_LOG} 2>&1
 
-	echo "===> remove cruft from the image"
+	# XXX not technically needed
+	#echo "===> removing cruft from the image"
 	#doas rm /etc/random.seed /var/db/host.random
 	doas rm -f ${_MNT}/etc/isakmpd/private/local.key \
 		${_MNT}/etc/isakmpd/local.pub \
@@ -158,11 +159,12 @@ create_img() {
 		${_MNT}/var/db/dhclient.leases.* >${_LOG} 2>&1
 	doas rm -rf ${_MNT}/tmp/{.[!.],}* >${_LOG} 2>&1
 
-	echo "===> disable root password"
+	# XXX not technically needed
+	#echo "===> disabling root password"
 	doas chroot ${_MNT} chpass -a \
 		'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh' >${_LOG} 2>&1
 
-	echo "===> unmount the image"
+	echo "===> unmounting the image"
 	doas umount ${_MNT} >${_LOG} 2>&1
 	doas vnconfig -u ${_VNDEV} >${_LOG} 2>&1
 
@@ -182,7 +184,7 @@ create_ami(){
 	if ! ${CREATE_IMG}; then
 		_IMGNAME=${_IMGNAME}-$TIMESTAMP
 	fi
-	echo "===> upload image to S3 (can take some time)"
+	echo "===> uploading image to S3 (can take some time)"
 	ec2-import-volume \
 		${_IMG} \
 		-f RAW \
@@ -197,7 +199,7 @@ create_ami(){
 		-b ${_BUCKETNAME}
 
 	echo
-	echo "===> convert image to volume (can take some time)"
+	echo "===> converting image to volume (can take some time)"
 	while [[ -z ${_VOL} ]]; do
 		_VOL=$(ec2-describe-conversion-tasks \
 			-O "${AWS_ACCESS_KEY_ID}" \
@@ -209,12 +211,12 @@ create_ami(){
 	done
 
 	#echo
-	#echo "===> delete local and remote disk images"
+	#echo "===> deleting local and remote disk images"
 	#rm -rf ${_WRKDIR}
 	#ec2-delete-disk-image
 
 	echo
-	echo "===> create snapshot (can take some time)"
+	echo "===> creating snapshot (can take some time)"
 	ec2-create-snapshot \
 	       -O "${AWS_ACCESS_KEY_ID}" \
 	       -W "${AWS_SECRET_ACCESS_KEY}" \
@@ -232,7 +234,7 @@ create_ami(){
 	done
 
 	echo
-	echo "===> register new AMI: ${_IMGNAME}"
+	echo "===> registering new AMI: ${_IMGNAME}"
 	ec2-register \
 		-n ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
