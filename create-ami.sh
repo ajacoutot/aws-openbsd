@@ -29,12 +29,11 @@ _ARCH=$(uname -m)
 
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-AWS_REGION=${AWS_REGION-eu-west-1}
-AWS_AZ=${AWS_AZ-eu-west-1a}
+AWS_REGION=${AWS_REGION:=eu-west-1}
+AWS_AZ=${AWS_AZ:=eu-west-1a}
 
-IMGSIZE=1 # GB
-MIRROR_HOST=${MIRROR_HOST-ftp.fr.openbsd.org}
-MIRROR=http://${MIRROR_HOST}/pub/OpenBSD/snapshots/${_ARCH}
+MIRROR_HOST=${MIRROR_HOST:=http://ftp.fr.openbsd.org}
+MIRROR=${MIRROR_HOST}/pub/OpenBSD/snapshots/${_ARCH}
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 
 ################################################################################
@@ -58,6 +57,7 @@ usage() {
 	echo "usage: ${0##*/} [-in]" >&2
 	echo "       -i /path/to/image" >&2
 	echo "       -n don't create an AMI" >&2
+	echo "       -s image/AMI size (in GB)" >&2
 	exit 1
 }
 
@@ -249,10 +249,12 @@ create_ami(){
 
 CREATE_AMI=true
 CREATE_IMG=true
-while getopts i:n arg; do
+IMGSIZE=1
+while getopts i:ns: arg; do
 	case ${arg} in
 	i)	CREATE_IMG=false; _IMG="${OPTARG}";;
 	n)	CREATE_AMI=false;;
+	s)	IMGSIZE="${OPTARG}";;
 	*)	usage;;
 	esac
 done
