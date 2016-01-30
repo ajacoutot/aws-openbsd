@@ -18,10 +18,8 @@
 
 # XXX script vmm(4) to create an "official" installation instead of the extract dance
 # XXX ec2-delete-disk-image
-# XXX use env vars and knobs instead of editing the script
 # XXX function()alise
-# XXX make it possible to build a release image instead of a snap
-# XXX /etc/hostname.ix0
+# XXX /etc/hostname.ix0?
 
 _ARCH=$(uname -m)
 
@@ -34,6 +32,7 @@ AWS_AZ=${AWS_AZ:=eu-west-1a}
 
 MIRROR_HOST=${MIRROR_HOST:=http://ftp.fr.openbsd.org}
 MIRROR=${MIRROR_HOST}/pub/OpenBSD/snapshots/${_ARCH}
+
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 
 ################################################################################
@@ -62,7 +61,7 @@ usage() {
 }
 
 create_img() {
-	_WRKDIR=$(mktemp -d -p /tmp aws-ami.XXXXXXXXXX)
+	_WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
 	_IMG=${_WRKDIR}/openbsd-$TIMESTAMP
 	local _LOG=${_WRKDIR}/log
 	local _MNT=${_WRKDIR}/mnt
