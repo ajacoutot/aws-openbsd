@@ -132,6 +132,7 @@ create_img() {
 	doas installboot -r ${_MNT} ${_VNDEV} >${_LOG} 2>&1
 
 	echo "===> configuring the image"
+	echo "installpath = ${MIRROR_HOST:##*//}" | doas tee ${_MNT}/etc/pkg.conf >${_LOG} 2>&1
 	echo "/dev/wd0a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
