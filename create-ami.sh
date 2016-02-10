@@ -55,8 +55,8 @@ umask 022
 usage() {
 	echo "usage: ${0##*/} [-in]" >&2
 	echo "       -i /path/to/image" >&2
-	echo "       -n don't create an AMI" >&2
-	echo "       -s image/AMI size (in GB)" >&2
+	echo "       -n only create the RAW image (not the AMI)" >&2
+	echo "       -s image/AMI size (in GB; default to 1)" >&2
 	exit 1
 }
 
