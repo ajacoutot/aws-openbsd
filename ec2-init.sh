@@ -59,6 +59,13 @@ ec2_userdata()
 		/bin/sh -c ${_script} && rm ${_script} || return
 }
 
+icleanup()
+{
+	# /etc/random.seed, /var/db/host.random, /var/log/*
+	rm /etc/{iked,isakmpd}/{local.pub,private/local.key} \
+		/etc/ssh/ssh_host_*
+}
+
 mock()
 {
 	[[ -n ${1} ]] || return
@@ -102,6 +109,7 @@ case ${1} in
 		exit 0 ;;
 	firstboot)
 		sed -i "/^!\/usr\/local\/libexec\/ec2-init/d" /etc/hostname.xnf0
+		icleanup
 		mock_pf open
 		ec2_pubkey
 		ec2_hostname
