@@ -106,8 +106,8 @@ case ${1} in
 		ec2_pubkey
 		ec2_hostname
 		ec2_userdata
-		ec2_fingerprints
 		mock_pf close
+		ec2_fingerprints
 		;;
 	*)
 		usage ;;
