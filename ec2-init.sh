@@ -18,7 +18,7 @@
 # AWS cloud-init like helper for OpenBSD
 # ======================================
 # Install as /usr/local/libexec/ec2-init and append to /etc/hostname.xnf0:
-# !/usr/local/libexec/ec2-init firstboot
+# !/usr/local/libexec/ec2-init
 
 ec2_fingerprints()
 {
@@ -38,6 +38,12 @@ ec2_hostname()
 	local _hostname="$(mock meta-data/local-hostname)" || return
 	hostname ${_hostname} || return
 	print -- "${_hostname}" >/etc/myname || return
+}
+
+ec2_instanceid()
+{
+	local _instanceid="$(mock meta-data/instance-id)" || return
+	print -- "${_instanceid}" >/var/db/ec2-init || return
 }
 
 ec2_pubkey()
@@ -106,20 +112,13 @@ if [[ $(id -u) != 0 ]]; then
 	exit 1
 fi
 
-case ${1} in
-	cloudinit)
-		# XXX TODO
-		exit 0 ;;
-	firstboot)
-		sed -i "/^!\/usr\/local\/libexec\/ec2-init/d" /etc/hostname.xnf0
-		icleanup
-		mock_pf open
-		ec2_pubkey
-		ec2_hostname
-		ec2_userdata
-		mock_pf close
-		ec2_fingerprints
-		;;
-	*)
-		usage ;;
-esac
+mock_pf open
+if [[ $(mock meta-data/instance-id) != $(cat /var/db/ec2-init 2>/dev/null) ]]; then
+	ec2_instanceid
+	ec2_pubkey
+	ec2_hostname
+	ec2_userdata
+	ec2_fingerprints
+	icleanup
+fi
+mock_pf close
