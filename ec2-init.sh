@@ -88,17 +88,14 @@ mock_pf()
 	[[ -z ${INRC} ]] && return
 	rcctl get pf status || return 0
 	case ${1} in
-		open)
-			print -- \
+	open)
+		print -- \
 			"pass out proto tcp from egress to 169.254.169.254 port www" | \
-			pfctl -f -
-			;;
-		close)
-			print -- "" | pfctl -f -
-			;;
-		*)
-			return 1
-			;;
+			pfctl -f - ;;
+	close)
+		print -- "" | pfctl -f - ;;
+	*)
+		return 1 ;;
 	esac
 }
 
