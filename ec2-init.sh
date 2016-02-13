@@ -14,7 +14,6 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-#
 # AWS cloud-init like helper for OpenBSD
 # ======================================
 # Install as /usr/local/libexec/ec2-init and append to /etc/hostname.xnf0:
