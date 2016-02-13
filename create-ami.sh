@@ -56,7 +56,7 @@ usage() {
 	echo "usage: ${0##*/} [-in]" >&2
 	echo "       -i /path/to/image" >&2
 	echo "       -n only create the RAW image (not the AMI)" >&2
-	echo "       -s image/AMI size (in GB; default to 1)" >&2
+	echo "       -s image/AMI size (in GB; default to 8)" >&2
 	exit 1
 }
 
@@ -249,7 +249,7 @@ create_ami(){
 
 CREATE_AMI=true
 CREATE_IMG=true
-IMGSIZE=1
+IMGSIZE=8
 while getopts i:ns: arg; do
 	case ${arg} in
 	i)	CREATE_IMG=false; _IMG="${OPTARG}";;
