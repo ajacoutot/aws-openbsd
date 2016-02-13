@@ -102,11 +102,6 @@ mock_pf()
 	esac
 }
 
-usage()
-{
-	echo "usage: ${0##*/} cloudinit|firstboot"; exit 1
-}
-
 if [[ $(id -u) != 0 ]]; then
 	echo "${0##*/}: needs root privileges"
 	exit 1
