@@ -138,7 +138,7 @@ create_img() {
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
-	echo "!/usr/local/libexec/ec2-init firstboot" | \
+	echo "!/usr/local/libexec/ec2-init" | \
 		doas tee -a ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 	doas chmod 0640 ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts >${_LOG} 2>&1
