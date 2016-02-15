@@ -67,7 +67,7 @@ ec2_userdata()
 icleanup()
 {
 	# packer: /var/log/* ?
-	rm /etc/{iked,isakmpd}/{local.pub,private/local.key} \
+	rm -f /etc/{iked,isakmpd}/{local.pub,private/local.key} \
 		/etc/ssh/ssh_host_*
 	# reset entropy files in case the installer put them in the image
 	>/etc/random.seed
