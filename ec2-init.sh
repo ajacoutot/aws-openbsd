@@ -66,12 +66,17 @@ ec2_userdata()
 
 icleanup()
 {
-	# packer: /var/log/* ?
+	local _l
+	# remove generated keys
 	rm -f /etc/{iked,isakmpd}/{local.pub,private/local.key} \
 		/etc/ssh/ssh_host_*
 	# reset entropy files in case the installer put them in the image
 	>/etc/random.seed
 	>/var/db/host.random
+	# empty log files
+	for _l in $(find /var/log -type f ! -name '*.gz' -size +0); do
+		>${_l}
+	done
 }
 
 mock()
