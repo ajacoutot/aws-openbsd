@@ -22,6 +22,7 @@
 # XXX /etc/hostname.ix0?
 
 _ARCH=$(uname -m)
+_DEPS="awscli ec2-api-tools"
 
 ################################################################################
 
@@ -43,6 +44,12 @@ elif [[ ${_ARCH} != i386 ]]; then
 	echo "${0##*/}: only supports amd64 and i386"
 	exit 1
 fi
+
+for _p in ${_DEPS}; do
+	if ! pkg_info -qe ${_p}-*; then
+		echo "${0##*/}: needs the ${_p} package"
+	fi
+done
 
 if [[ $(doas ${RANDOM} 2>/dev/null) == 1 ]]; then
 	echo "${0##*/}: needs doas(1) privileges"
