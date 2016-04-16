@@ -48,6 +48,7 @@ fi
 for _p in ${_DEPS}; do
 	if ! pkg_info -qe ${_p}-*; then
 		echo "${0##*/}: needs the ${_p} package"
+		exit 1
 	fi
 done
 
