@@ -19,6 +19,8 @@
 # Install as /usr/local/libexec/ec2-init and append to /etc/hostname.xnf0:
 # !/usr/local/libexec/ec2-init
 
+# XXXTODO https://cloudinit.readthedocs.org/en/latest/topics/format.html
+
 ec2_fingerprints()
 {
 	cat <<'EOF-RC' >>/etc/rc.firsttime
