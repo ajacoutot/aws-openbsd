@@ -253,7 +253,7 @@ create_ami(){
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		--region ${AWS_REGION} \
 		-a ${_ARCH} \
-		-d ${DESCRIPTION} \
+		-d "${DESCRIPTION}" \
 		--root-device-name /dev/sda1 \
 		--virtualization-type hvm \
 		-s ${_SNAP}
