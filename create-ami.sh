@@ -34,6 +34,7 @@ AWS_AZ=${AWS_AZ:=eu-west-1a}
 MIRROR_HOST=${MIRROR_HOST:=http://ftp.fr.openbsd.org}
 MIRROR=${MIRROR_HOST}/pub/OpenBSD/snapshots/${_ARCH}
 
+DESCRIPTION="OpenBSD-current ${_ARCH}"
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 
 ################################################################################
@@ -61,7 +62,8 @@ set -e
 umask 022
 
 usage() {
-	echo "usage: ${0##*/} [-in]" >&2
+	echo "usage: ${0##*/} [-dins]" >&2
+	echo "       -d \"$DESCRIPTION\"" >&2
 	echo "       -i /path/to/image" >&2
 	echo "       -n only create the RAW image (not the AMI)" >&2
 	echo "       -s image/AMI size (in GB; default to 8)" >&2
@@ -192,6 +194,8 @@ create_ami(){
 	if ! ${CREATE_IMG}; then
 		_IMGNAME=${_IMGNAME}-$TIMESTAMP
 	fi
+	local DESCRIPTION="${DESCRIPTION} ${_IMGNAME}"
+
 	echo "===> uploading image to S3 (can take some time)"
 	ec2-import-volume \
 		${_IMG} \
@@ -249,7 +253,7 @@ create_ami(){
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		--region ${AWS_REGION} \
 		-a ${_ARCH} \
-		-d "OpenBSD-current $(uname -m) ${_IMGNAME}" \
+		-d ${DESCRIPTION} \
 		--root-device-name /dev/sda1 \
 		--virtualization-type hvm \
 		-s ${_SNAP}
@@ -258,8 +262,9 @@ create_ami(){
 CREATE_AMI=true
 CREATE_IMG=true
 IMGSIZE=8
-while getopts i:ns: arg; do
+while getopts d:i:ns: arg; do
 	case ${arg} in
+	d)	DESCRIPTION="${OPTARG}";;
 	i)	CREATE_IMG=false; _IMG="${OPTARG}";;
 	n)	CREATE_AMI=false;;
 	s)	IMGSIZE="${OPTARG}";;
