@@ -20,6 +20,7 @@
 # XXX ec2-delete-disk-image
 # XXX function()alise
 # XXX /etc/hostname.ix0?
+# XXX obootstrap (KVM (vio0, sd0a)
 
 _ARCH=$(uname -m)
 _DEPS="awscli ec2-api-tools"
