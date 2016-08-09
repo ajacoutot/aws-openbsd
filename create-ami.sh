@@ -154,10 +154,10 @@ create_img() {
 	doas chmod 0640 ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
 	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts >${_LOG} 2>&1
 	echo "::1\t\tlocalhost" | doas tee -a ${_MNT}/etc/hosts >${_LOG} 2>&1
-	doas chroot ${_MNT} ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
+	doas chroot ${_MNT} env -i ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
 		>${_LOG} 2>&1
-	doas chroot ${_MNT} ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
-	doas chroot ${_MNT} rcctl disable sndiod >${_LOG} 2>&1
+	doas chroot ${_MNT} env -i ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
+	doas chroot ${_MNT} env -i rcctl disable sndiod >${_LOG} 2>&1
 
 	# XXX not technically needed
 	#echo "===> removing cruft from the image"
@@ -172,7 +172,7 @@ create_img() {
 
 	# XXX not technically needed
 	#echo "===> disabling root password"
-	doas chroot ${_MNT} chpass -a \
+	doas chroot ${_MNT} env -i chpass -a \
 		'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh' >${_LOG} 2>&1
 
 	echo "===> unmounting the image"
