@@ -1,0 +1,42 @@
+===> creating image container
+===> creating image filesystem
+===> mounting image
+===> fetching sets (can take some time)
+===> fetching ec2-init
+===> extracting sets
+===> installing MP kernel
+===> installing ec2-init
+===> removing downloaded files
+===> creating devices
+===> storing entropy for the initial boot
+===> installing master boot record
+===> configuring the image
+===> unmounting the image
+===> image available at:
+     /tmp/aws-ami.4tg6kvoYw9/openbsd-20160920T012639Z
+
+===> uploading image to S3 (can take some time)
+Requesting volume size: 8 GB
+TaskType        IMPORTVOLUME    TaskId  import-vol-fghickhh     ExpirationTime  2016-09-27T01:39:56Z    Status  active  StatusMessage   Pending
+DISKIMAGE       DiskImageFormat RAW     DiskImageSize   8589934592      VolumeSize      8       AvailabilityZone        eu-west-1a      ApproximateBytesConverted       0       Description     openbsd-20160920T012639Z
+Creating new manifest at openbsd-20160920t012639z/057c41a4-2ca5-4fd4-a692-31515c9ffba9/openbsd-20160920T012639Zmanifest.xml
+Uploading the manifest file
+Uploading 8589934592 bytes across 820 parts
+----------------------------------------------------------------------------------------------------
+   Upload progress              Estimated time      Estimated speed
+ \ 100% [====================>]                     0.236 MBps
+********************* All 8589934592 Bytes uploaded in 10h 06m 35s  *********************
+Done uploading.
+Average speed was 0.236 MBps
+The disk image for import-vol-fghickhh has been uploaded to Amazon S3
+where it is being converted into an EBS volume.  You may monitor the
+progress of this task by running ec2-describe-conversion-tasks.  When
+the task is completed, you may use ec2-delete-disk-image to remove the
+image from S3.
+
+===> converting image to volume (can take some time)
+
+===> creating snapshot (can take some time)
+SNAPSHOT        snap-4f9c607d   vol-4f41b7c9    pending 2016-09-20T11:50:16+0000                495039774644    8       openbsd-20160920T012639Z        Not Encrypted
+
+===> registering new AMI: openbsd-20160920T012639Z
