@@ -25,7 +25,7 @@ Running whatever is in this repo will propably end up destroying a kitten factor
 ## Usage
 
 ```shell
-create-ami.sh [-dins]
+create-ami.sh [-dinsr]
     -d "OpenBSD-current amd64"
     -i /path/to/image
     -n only create the RAW image (not the AMI)
