@@ -23,17 +23,23 @@
 # XXX obootstrap (KVM (vio0, sd0a)
 
 _ARCH=$(uname -m)
-_DEPS="awscli ec2-api-tools"
+_RELEASE=$(uname -r)
+_DEPS="awscli ec2-api-tools jdk"
 
 ################################################################################
 
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+if [[ -z ${AWS_ACCESS_KEY_ID} || -z ${AWS_SECRET_ACCESS_KEY} ]]; then
+	AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
+	AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
+fi
 AWS_REGION=${AWS_REGION:=eu-west-1}
 AWS_AZ=${AWS_AZ:=eu-west-1a}
 
+MIRROR_ARCH=${_ARCH}
 MIRROR_HOST=${MIRROR_HOST:=http://ftp.fr.openbsd.org}
-MIRROR=${MIRROR_HOST}/pub/OpenBSD/snapshots/${_ARCH}
+MIRROR=${MIRROR_HOST}/pub/OpenBSD/snapshots/${MIRROR_ARCH}
 
 DESCRIPTION="OpenBSD-current ${_ARCH}"
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
@@ -63,11 +69,12 @@ set -e
 umask 022
 
 usage() {
-	echo "usage: ${0##*/} [-dins]" >&2
+	echo "usage: ${0##*/} [-dinsr]" >&2
 	echo "       -d \"$DESCRIPTION\"" >&2
 	echo "       -i /path/to/image" >&2
 	echo "       -n only create the RAW image (not the AMI)" >&2
 	echo "       -s image/AMI size (in GB; default to 8)" >&2
+	echo "       -r build released version (6.0|5.9)" >&2
 	exit 1
 }
 
@@ -76,7 +83,7 @@ create_img() {
 	_IMG=${_WRKDIR}/openbsd-$TIMESTAMP
 	local _LOG=${_WRKDIR}/log
 	local _MNT=${_WRKDIR}/mnt
-	local _REL=$(uname -r | tr -d '.')
+	local _REL=$(echo ${_RELEASE} | tr -d '.')
 	local _VNDEV=$(doas vnconfig -l | grep 'not in use' | head -1 | cut -d ':' -f1)
 
 	if [[ -z ${_VNDEV} ]]; then
@@ -102,7 +109,7 @@ create_img() {
 	echo "===> mounting image"
 	doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
 
-	echo "===> fetching sets (can take some time)"
+	echo "===> fetching sets from ${MIRROR}"
 	( cd ${_WRKDIR} && \
 		ftp -V ${MIRROR}/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} >${_LOG} 2>&1 )
 
@@ -197,7 +204,7 @@ create_ami(){
 	fi
 	local DESCRIPTION="${DESCRIPTION} ${_IMGNAME}"
 
-	echo "===> uploading image to S3 (can take some time)"
+	echo "===> uploading image to S3 at ${AWS_REGION} (takes some time)"
 	ec2-import-volume \
 		${_IMG} \
 		-f RAW \
@@ -212,7 +219,7 @@ create_ami(){
 		-b ${_BUCKETNAME}
 
 	echo
-	echo "===> converting image to volume (can take some time)"
+	echo "===> converting image to volume at ${AWS_REGION} (takes some time)"
 	while [[ -z ${_VOL} ]]; do
 		_VOL=$(ec2-describe-conversion-tasks \
 			-O "${AWS_ACCESS_KEY_ID}" \
@@ -229,7 +236,7 @@ create_ami(){
 	#ec2-delete-disk-image
 
 	echo
-	echo "===> creating snapshot (can take some time)"
+	echo "===> creating snapshot at ${AWS_REGION} (takes some time)"
 	ec2-create-snapshot \
 	       -O "${AWS_ACCESS_KEY_ID}" \
 	       -W "${AWS_SECRET_ACCESS_KEY}" \
@@ -247,7 +254,7 @@ create_ami(){
 	done
 
 	echo
-	echo "===> registering new AMI: ${_IMGNAME}"
+	echo "===> registering new AMI at ${AWS_REGION}: ${_IMGNAME}"
 	ec2-register \
 		-n ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
@@ -263,12 +270,13 @@ create_ami(){
 CREATE_AMI=true
 CREATE_IMG=true
 IMGSIZE=8
-while getopts d:i:ns: arg; do
+while getopts d:i:ns:r: arg; do
 	case ${arg} in
 	d)	DESCRIPTION="${OPTARG}";;
 	i)	CREATE_IMG=false; _IMG="${OPTARG}";;
 	n)	CREATE_AMI=false;;
 	s)	IMGSIZE="${OPTARG}";;
+	r)  _RELEASE="${OPTARG}"; MIRROR=${MIRROR_HOST}/pub/OpenBSD/${_RELEASE}/${MIRROR_ARCH}; DESCRIPTION="OpenBSD ${_RELEASE} ${_ARCH}";;
 	*)	usage;;
 	esac
 done
@@ -284,6 +292,18 @@ if ${CREATE_AMI}; then
 	if [[ -z ${AWS_ACCESS_KEY_ID} || -z ${AWS_SECRET_ACCESS_KEY} ]]; then
 		echo "${0##*/}: AWS credentials aren't set"
 		exit 1
+	fi
+	if [[ -z ${EC2_HOME} ]]; then
+		echo "${0##*/}: EC2_HOME is not set; export EC2_HOME=/usr/local/ec2-api-tools"
+		exit 1
+	else
+		export PATH=${EC2_HOME}/bin:$PATH
+	fi
+	if [[ -z ${JAVA_HOME} ]]; then
+		echo "${0##*/}: JAVA_HOME is not set; export JAVA_HOME=/usr/local/jdk-1.7.0"
+		exit 1
+	else
+		export PATH=${JAVA_HOME}/bin:$PATH
 	fi
 	if ! type ec2-import-volume >/dev/null; then
 		echo "${0##*/}: needs the EC2 CLI tools"
