@@ -69,7 +69,7 @@ set -e
 umask 022
 
 usage() {
-	echo "usage: ${0##*/} [-dins]" >&2
+	echo "usage: ${0##*/} [-dinsr]" >&2
 	echo "       -d \"$DESCRIPTION\"" >&2
 	echo "       -i /path/to/image" >&2
 	echo "       -n only create the RAW image (not the AMI)" >&2
