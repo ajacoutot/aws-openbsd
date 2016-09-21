@@ -1,7 +1,8 @@
+# ./create-ami.sh -r 6.0
 ===> creating image container
 ===> creating image filesystem
 ===> mounting image
-===> fetching sets (can take some time)
+===> fetching sets from http://ftp.fr.openbsd.org/pub/OpenBSD/6.0/amd64
 ===> fetching ec2-init
 ===> extracting sets
 ===> installing MP kernel
@@ -13,30 +14,31 @@
 ===> configuring the image
 ===> unmounting the image
 ===> image available at:
-     /tmp/aws-ami.4tg6kvoYw9/openbsd-20160920T012639Z
+     /tmp/aws-ami.yOevsREsZl/openbsd-20160921T093156Z
 
-===> uploading image to S3 (can take some time)
+===> uploading image to S3 at eu-west-1 (takes some time)
 Requesting volume size: 8 GB
-TaskType        IMPORTVOLUME    TaskId  import-vol-fghickhh     ExpirationTime  2016-09-27T01:39:56Z    Status  active  StatusMessage   Pending
-DISKIMAGE       DiskImageFormat RAW     DiskImageSize   8589934592      VolumeSize      8       AvailabilityZone        eu-west-1a      ApproximateBytesConverted       0       Description     openbsd-20160920T012639Z
-Creating new manifest at openbsd-20160920t012639z/057c41a4-2ca5-4fd4-a692-31515c9ffba9/openbsd-20160920T012639Zmanifest.xml
+TaskType        IMPORTVOLUME    TaskId  import-vol-fh2g2q7x     ExpirationTime  2016-09-28T10:05:45Z    Status  active  StatusMessage   Pending
+DISKIMAGE       DiskImageFormat RAW     DiskImageSize   8589934592      VolumeSize      8       AvailabilityZone        eu-west-1a      ApproximateBytesConverted       0       Description     openbsd-20160921T093156Z
+Creating new manifest at openbsd-20160921t093156z/ab14285f-f5b6-4d98-97b8-38ed826e236f/openbsd-20160921T093156Zmanifest.xml
 Uploading the manifest file
 Uploading 8589934592 bytes across 820 parts
 ----------------------------------------------------------------------------------------------------
    Upload progress              Estimated time      Estimated speed
- \ 100% [====================>]                     0.236 MBps
-********************* All 8589934592 Bytes uploaded in 10h 06m 35s  *********************
+ \ 100% [====================>]                     4.761 MBps
+********************* All 8589934592 Bytes uploaded in 30m 04s  *********************
 Done uploading.
-Average speed was 0.236 MBps
-The disk image for import-vol-fghickhh has been uploaded to Amazon S3
+Average speed was 4.761 MBps
+The disk image for import-vol-fh2g2q7x has been uploaded to Amazon S3
 where it is being converted into an EBS volume.  You may monitor the
 progress of this task by running ec2-describe-conversion-tasks.  When
 the task is completed, you may use ec2-delete-disk-image to remove the
 image from S3.
 
-===> converting image to volume (can take some time)
+===> converting image to volume at eu-west-1 (takes some time)
 
-===> creating snapshot (can take some time)
-SNAPSHOT        snap-4f9c607d   vol-4f41b7c9    pending 2016-09-20T11:50:16+0000                495039774644    8       openbsd-20160920T012639Z        Not Encrypted
+===> creating snapshot at eu-west-1 (takes some time)
+SNAPSHOT        snap-c1619cb8   vol-2e39caa8    pending 2016-09-21T10:38:17+0000                495039774644    8       openbsd-20160921T093156Z        Not Encrypted
 
-===> registering new AMI: openbsd-20160920T012639Z
+===> registering new AMI at eu-west-1: openbsd-20160921T093156Z
+IMAGE   ami-61c1ba12
