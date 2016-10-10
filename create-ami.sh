@@ -23,32 +23,22 @@
 # XXX obootstrap (KVM (vio0, sd0a)
 
 _ARCH=$(uname -m)
-_RELEASE=$(uname -r)
-_DEPS="awscli ec2-api-tools jdk"
+_DEPS="awscli ec2-api-tools"
 
 ################################################################################
 
-AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-if [[ -z ${AWS_ACCESS_KEY_ID} || -z ${AWS_SECRET_ACCESS_KEY} ]]; then
-	AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY}
-	AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
-fi
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:=${AWS_ACCESS_KEY}}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
 AWS_AZ=${AWS_AZ:=eu-west-1a}
 
-MIRROR_ARCH=${_ARCH}
-MIRROR_HOST=${MIRROR_HOST:=http://ftp.fr.openbsd.org}
-MIRROR=${MIRROR_HOST}/pub/OpenBSD/snapshots/${MIRROR_ARCH}
+MIRROR=http://ftp.fr.openbsd.org
 
-DESCRIPTION="OpenBSD-current ${_ARCH}"
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 
 ################################################################################
 
-if [[ ${_ARCH} == amd64 ]]; then
-	_ARCH=x86_64
-elif [[ ${_ARCH} != i386 ]]; then
+if [[ ${_ARCH} != @(amd64|i386) ]]; then
 	echo "${0##*/}: only supports amd64 and i386"
 	exit 1
 fi
@@ -69,22 +59,23 @@ set -e
 umask 022
 
 usage() {
-	echo "usage: ${0##*/} [-dinsr]" >&2
-	echo "       -d \"$DESCRIPTION\"" >&2
-	echo "       -i /path/to/image" >&2
+	echo "usage: ${0##*/}" >&2
+	echo "       -d \"description\"" >&2
+	echo "       -i \"/path/to/image\"" >&2
 	echo "       -n only create the RAW image (not the AMI)" >&2
-	echo "       -s image/AMI size (in GB; default to 8)" >&2
-	echo "       -r build released version (6.0|5.9)" >&2
+	echo "       -r \"release\" (e.g 6.0; default to current)" >&2
+	echo "       -s \"size\" (in GB; default to 8)" >&2
 	exit 1
 }
 
 create_img() {
 	_WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
-	_IMG=${_WRKDIR}/openbsd-$TIMESTAMP
 	local _LOG=${_WRKDIR}/log
 	local _MNT=${_WRKDIR}/mnt
-	local _REL=$(echo ${_RELEASE} | tr -d '.')
+	local _REL=${RELEASE:-$(uname -r)}
+	_REL=$(echo ${_REL} | tr -d '.')
 	local _VNDEV=$(doas vnconfig -l | grep 'not in use' | head -1 | cut -d ':' -f1)
+	_IMG=${_WRKDIR}/openbsd-${RELEASE:-current}-${_ARCH}-${TIMESTAMP}
 
 	if [[ -z ${_VNDEV} ]]; then
 		echo "${0##*/}: no vnd(4) device available"
@@ -109,9 +100,10 @@ create_img() {
 	echo "===> mounting image"
 	doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
 
-	echo "===> fetching sets from ${MIRROR}"
+	echo "===> fetching sets from ${MIRROR:##*//} (can take some time)"
 	( cd ${_WRKDIR} && \
-		ftp -V ${MIRROR}/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} >${_LOG} 2>&1 )
+		ftp -V ${MIRROR}/pub/OpenBSD/${RELEASE:-snapshots}/${_ARCH}/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} \
+		>${_LOG} 2>&1 )
 
 	echo "===> fetching ec2-init"
 	ftp -MV -o ${_WRKDIR}/ec2-init \
@@ -150,7 +142,9 @@ create_img() {
 	doas installboot -r ${_MNT} ${_VNDEV} >${_LOG} 2>&1
 
 	echo "===> configuring the image"
-	echo "installpath = ${MIRROR_HOST:##*//}" | doas tee ${_MNT}/etc/pkg.conf >${_LOG} 2>&1
+	if [[ ! -d ${MIRROR:##*//} ]]; then
+		echo "installpath = ${MIRROR:##*//}" | doas tee ${_MNT}/etc/pkg.conf >${_LOG} 2>&1
+	fi
 	echo "/dev/wd0a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
@@ -199,12 +193,11 @@ create_ami(){
 	local _IMGNAME=${_IMG##*/}
 	local _BUCKETNAME=${_IMGNAME}
 	typeset -l _BUCKETNAME
-	if ! ${CREATE_IMG}; then
-		_IMGNAME=${_IMGNAME}-$TIMESTAMP
-	fi
-	local DESCRIPTION="${DESCRIPTION} ${_IMGNAME}"
 
-	echo "===> uploading image to S3 at ${AWS_REGION} (takes some time)"
+	[[ -n ${DESCRIPTION} ]] || \
+		local DESCRIPTION="OpenBSD ${RELEASE:-current} ${_ARCH} ${TIMESTAMP}"
+
+	echo "===> uploading image to S3 (can take some time)"
 	ec2-import-volume \
 		${_IMG} \
 		-f RAW \
@@ -219,7 +212,7 @@ create_ami(){
 		-b ${_BUCKETNAME}
 
 	echo
-	echo "===> converting image to volume at ${AWS_REGION} (takes some time)"
+	echo "===> converting image to volume in region ${AWS_REGION} (can take some time)"
 	while [[ -z ${_VOL} ]]; do
 		_VOL=$(ec2-describe-conversion-tasks \
 			-O "${AWS_ACCESS_KEY_ID}" \
@@ -236,7 +229,7 @@ create_ami(){
 	#ec2-delete-disk-image
 
 	echo
-	echo "===> creating snapshot at ${AWS_REGION} (takes some time)"
+	echo "===> creating snapshot n region ${AWS_REGION} (can take some time)"
 	ec2-create-snapshot \
 	       -O "${AWS_ACCESS_KEY_ID}" \
 	       -W "${AWS_SECRET_ACCESS_KEY}" \
@@ -254,7 +247,10 @@ create_ami(){
 	done
 
 	echo
-	echo "===> registering new AMI at ${AWS_REGION}: ${_IMGNAME}"
+	echo "===> registering new AMI in region ${AWS_REGION}: ${_IMGNAME}"
+	if [[ "${_ARCH}" == "amd64" ]]; then
+		local _ARCH=x86_64
+	fi
 	ec2-register \
 		-n ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
@@ -270,16 +266,21 @@ create_ami(){
 CREATE_AMI=true
 CREATE_IMG=true
 IMGSIZE=8
-while getopts d:i:ns:r: arg; do
+while getopts d:i:nr:s: arg; do
 	case ${arg} in
 	d)	DESCRIPTION="${OPTARG}";;
 	i)	CREATE_IMG=false; _IMG="${OPTARG}";;
 	n)	CREATE_AMI=false;;
+	r)	RELEASE="${OPTARG}";;
 	s)	IMGSIZE="${OPTARG}";;
-	r)  _RELEASE="${OPTARG}"; MIRROR=${MIRROR_HOST}/pub/OpenBSD/${_RELEASE}/${MIRROR_ARCH}; DESCRIPTION="OpenBSD ${_RELEASE} ${_ARCH}";;
 	*)	usage;;
 	esac
 done
+
+[[ -n ${JAVA_HOME} ]] || export JAVA_HOME=$(javaPathHelper -h ec2-api-tools)
+[[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
+which ec2-import-volume >/dev/null 2>&1 || \
+	export PATH=${EC2_HOME}/bin:${PATH}
 
 if ${CREATE_IMG}; then
 	create_img
@@ -292,18 +293,6 @@ if ${CREATE_AMI}; then
 	if [[ -z ${AWS_ACCESS_KEY_ID} || -z ${AWS_SECRET_ACCESS_KEY} ]]; then
 		echo "${0##*/}: AWS credentials aren't set"
 		exit 1
-	fi
-	if [[ -z ${EC2_HOME} ]]; then
-		echo "${0##*/}: EC2_HOME is not set; export EC2_HOME=/usr/local/ec2-api-tools"
-		exit 1
-	else
-		export PATH=${EC2_HOME}/bin:$PATH
-	fi
-	if [[ -z ${JAVA_HOME} ]]; then
-		echo "${0##*/}: JAVA_HOME is not set; export JAVA_HOME=/usr/local/jdk-1.7.0"
-		exit 1
-	else
-		export PATH=${JAVA_HOME}/bin:$PATH
 	fi
 	if ! type ec2-import-volume >/dev/null; then
 		echo "${0##*/}: needs the EC2 CLI tools"
