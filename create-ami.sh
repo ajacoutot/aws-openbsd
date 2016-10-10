@@ -38,10 +38,6 @@ MIRROR=${MIRROR_HOST}/pub/OpenBSD/snapshots/${_ARCH}
 DESCRIPTION="OpenBSD-current ${_ARCH}"
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 
-export EC2_HOME=/usr/local/ec2-api-tools
-export JAVA_HOME=$(javaPathHelper -h ec2-api-tools)
-export PATH=${EC2_HOME}/bin:${PATH}
-
 ################################################################################
 
 if [[ ${_ARCH} == amd64 ]]; then
@@ -276,6 +272,11 @@ while getopts d:i:ns: arg; do
 	*)	usage;;
 	esac
 done
+
+[[ -n ${JAVA_HOME} ]] || export JAVA_HOME=$(javaPathHelper -h ec2-api-tools)
+[[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
+which ec2-import-volume 2>&1 >/dev/null || \
+	export PATH=${EC2_HOME}/bin:${PATH}
 
 if ${CREATE_IMG}; then
 	create_img
