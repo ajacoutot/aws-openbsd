@@ -27,8 +27,8 @@ _DEPS="awscli ec2-api-tools"
 
 ################################################################################
 
-AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:=${AWS_ACCESS_KEY}}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
 AWS_AZ=${AWS_AZ:=eu-west-1a}
 
@@ -37,6 +37,10 @@ MIRROR=${MIRROR_HOST}/pub/OpenBSD/snapshots/${_ARCH}
 
 DESCRIPTION="OpenBSD-current ${_ARCH}"
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
+
+export EC2_HOME=/usr/local/ec2-api-tools
+export JAVA_HOME=$(javaPathHelper -h ec2-api-tools)
+export PATH=${EC2_HOME}/bin:${PATH}
 
 ################################################################################
 
