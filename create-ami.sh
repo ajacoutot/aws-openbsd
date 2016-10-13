@@ -32,7 +32,7 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
 AWS_AZ=${AWS_AZ:=eu-west-1a}
 
-MIRROR=http://ftp.fr.openbsd.org
+MIRROR=${MIRROR:=http://ftp.fr.openbsd.org}
 
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 
