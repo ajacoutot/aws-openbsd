@@ -21,6 +21,8 @@
 
 # XXXTODO https://cloudinit.readthedocs.org/en/latest/topics/format.html
 
+set -e
+
 ec2_fingerprints()
 {
 	cat <<'EOF-RC' >>/etc/rc.firsttime
@@ -36,37 +38,61 @@ EOF-RC
 
 ec2_hostname()
 {
-	local _hostname="$(mock meta-data/local-hostname)" || return
-	hostname ${_hostname} || return
-	print -- "${_hostname}" >/etc/myname || return
+	local _hostname="$(mock meta-data/local-hostname)"
+	hostname ${_hostname}
+	print -- "${_hostname}" >/etc/myname
 }
 
 ec2_instanceid()
 {
-	local _instanceid="$(mock meta-data/instance-id)" || return
-	print -- "${_instanceid}" >/var/db/ec2-init || return
+	local _instanceid="$(mock meta-data/instance-id)"
+	print -- "${_instanceid}" >/var/db/ec2-init
 }
 
 ec2_pubkey()
 {
-	local _pubkey="$(mock meta-data/public-keys/0/openssh-key)" || return
-	install -d -m 0700 /root/.ssh || return
+	local _pubkey="$(mock meta-data/public-keys/0/openssh-key)"
+	install -d -m 0700 /root/.ssh
 	if [[ ! -f /root/.ssh/authorized_keys ]]; then
-		install -m 0600 /dev/null /root/.ssh/authorized_keys || return
+		install -m 0600 /dev/null /root/.ssh/authorized_keys
 	fi
-	print -- "${_pubkey}" >>/root/.ssh/authorized_keys || return
+	print -- "${_pubkey}" >>/root/.ssh/authorized_keys
 }
 
 ec2_userdata()
 {
-	local _userdata="$(mock user-data)" || return
+	local _userdata="$(mock user-data)"
 	[[ ${_userdata%${_userdata#??}} == "#!" ]] || return 0
-	local _script="$(mktemp -p /tmp -t aws-user-data.XXXXXXXXXX)" || return
-	print -- "${_userdata}" >${_script} && chmod u+x ${_script} && \
-		/bin/sh -c ${_script} && rm ${_script} || return
+	local _script="$(mktemp -p /tmp -t aws-user-data.XXXXXXXXXX)"
+	print -- "${_userdata}" >${_script} && chmod u+x ${_script} &&
+		/bin/sh -c ${_script} && rm ${_script}
 }
 
-icleanup()
+mock()
+{
+	[[ -n ${1} ]]
+	local _ret
+	_ret=$(ftp -MVo - http://169.254.169.254/latest/${1} 2>/dev/null)
+	[[ -n ${_ret} ]] && print -- "${_ret}"
+}
+
+mock_pf()
+{
+	[[ -z ${INRC} ]] && return
+	rcctl get pf status || return 0
+	case ${1} in
+	open)
+		print -- \
+			"pass out proto tcp from egress to 169.254.169.254 port www" |
+			pfctl -f - ;;
+	close)
+		print -- "" | pfctl -f - ;;
+	*)
+		return 1 ;;
+	esac
+}
+
+sysclean()
 {
 	local _l
 	# remove generated keys
@@ -81,30 +107,6 @@ icleanup()
 	done
 }
 
-mock()
-{
-	[[ -n ${1} ]] || return
-	local _ret
-	_ret=$(ftp -MVo - http://169.254.169.254/latest/${1} 2>/dev/null) || return
-	[[ -n ${_ret} ]] && print -- "${_ret}" || return
-}
-
-mock_pf()
-{
-	[[ -z ${INRC} ]] && return
-	rcctl get pf status || return 0
-	case ${1} in
-	open)
-		print -- \
-			"pass out proto tcp from egress to 169.254.169.254 port www" | \
-			pfctl -f - ;;
-	close)
-		print -- "" | pfctl -f - ;;
-	*)
-		return 1 ;;
-	esac
-}
-
 if [[ $(id -u) != 0 ]]; then
 	echo "${0##*/}: needs root privileges"
 	exit 1
@@ -117,6 +119,6 @@ if [[ $(mock meta-data/instance-id) != $(cat /var/db/ec2-init 2>/dev/null) ]]; t
 	ec2_hostname
 	ec2_userdata
 	ec2_fingerprints
-	icleanup
+	sysclean
 fi
 mock_pf close
