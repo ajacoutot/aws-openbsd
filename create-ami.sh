@@ -32,7 +32,7 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
 AWS_AZ=${AWS_AZ:=eu-west-1a}
 
-MIRROR=${MIRROR:=http://ftp.fr.openbsd.org}
+MIRROR=${MIRROR:=https://ftp.fr.openbsd.org}
 
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 
@@ -88,12 +88,13 @@ create_img() {
 	trap "cat ${_LOG}" ERR
 
 	echo "===> creating image container"
-	doas dd if=/dev/zero of=${_IMG} bs=1m count=$((${IMGSIZE}*1024)) \
-		>${_LOG} 2>&1
+	vmctl create ${_IMG} -s ${IMGSIZE}G >${_LOG} 2>&1
 
 	echo "===> creating image filesystem"
 	doas vnconfig ${_VNDEV} ${_IMG} >${_LOG} 2>&1
 	doas fdisk -iy ${_VNDEV} >${_LOG} 2>&1
+#	doas disklabel -F ${_WRKDIR}/fstab -w -A vnd0 >${_LOG} 2>&1
+#	doas disklabel -Aw ${_VNDEV} >${_LOG} 2>&1
 	printf "a\n\n\n\n\nq\n\n" | doas disklabel -E ${_VNDEV} >${_LOG} 2>&1
 	doas newfs /dev/r${_VNDEV}a >${_LOG} 2>&1
 
