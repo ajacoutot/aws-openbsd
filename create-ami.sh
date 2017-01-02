@@ -145,7 +145,8 @@ create_img() {
 	if [[ ! -d ${MIRROR:##*//} ]]; then
 		echo "installpath = ${MIRROR:##*//}" | doas tee ${_MNT}/etc/pkg.conf >${_LOG} 2>&1
 	fi
-	echo "/dev/wd0a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
+	echo "$(doas disklabel vnd0 | grep duid | cut -d ' ' -f 2).a / ffs rw 1 1" |
+		doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
@@ -277,6 +278,17 @@ while getopts d:i:nr:s: arg; do
 	esac
 done
 
+if ${CREATE_AMI}; then
+	if [[ -z ${AWS_ACCESS_KEY_ID} || -z ${AWS_SECRET_ACCESS_KEY} ]]; then
+		echo "${0##*/}: AWS credentials aren't set"
+		exit 1
+	fi
+	if ! type ec2-import-volume >/dev/null; then
+		echo "${0##*/}: needs the EC2 CLI tools"
+		exit 1
+	fi
+fi
+
 [[ -n ${JAVA_HOME} ]] || export JAVA_HOME=$(javaPathHelper -h ec2-api-tools)
 [[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
 which ec2-import-volume >/dev/null 2>&1 || \
@@ -290,13 +302,5 @@ elif [[ ! -f ${_IMG} ]]; then
 fi
 
 if ${CREATE_AMI}; then
-	if [[ -z ${AWS_ACCESS_KEY_ID} || -z ${AWS_SECRET_ACCESS_KEY} ]]; then
-		echo "${0##*/}: AWS credentials aren't set"
-		exit 1
-	fi
-	if ! type ec2-import-volume >/dev/null; then
-		echo "${0##*/}: needs the EC2 CLI tools"
-		exit 1
-	fi
 	create_ami
 fi
