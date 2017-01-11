@@ -21,6 +21,8 @@
 # XXX function()alise
 # XXX /etc/hostname.ix0?
 # XXX obootstrap (KVM (vio0, sd0a)
+# XXX hotplugd xnf1...
+# XXX drop ec2-tools dependency
 
 _ARCH=$(uname -m)
 _DEPS="awscli ec2-api-tools"
@@ -73,14 +75,9 @@ create_img() {
 	local _LOG=${_WRKDIR}/log
 	local _MNT=${_WRKDIR}/mnt
 	local _REL=${RELEASE:-$(uname -r)}
-	local _disk=sd0
 	_REL=$(echo ${_REL} | tr -d '.')
 	local _VNDEV=$(doas vnconfig -l | grep 'not in use' | head -1 | cut -d ':' -f1)
 	_IMG=${_WRKDIR}/openbsd-${RELEASE:-current}-${_ARCH}-${TIMESTAMP}
-
-	if [[ ${RELEASE} == 6.0 ]]; then
-		_disk=wd0
-	fi
 
 	if [[ -z ${_VNDEV} ]]; then
 		echo "${0##*/}: no vnd(4) device available"
@@ -151,8 +148,7 @@ create_img() {
 	if [[ ! -d ${MIRROR:##*//} ]]; then
 		echo "installpath = ${MIRROR:##*//}" | doas tee ${_MNT}/etc/pkg.conf >${_LOG} 2>&1
 	fi
-#	echo "$(doas disklabel vnd0 | grep duid | cut -d ' ' -f 2).a / ffs rw 1 1" |
-	echo "/dev/${_disk}a / ffs rw 1 1" |
+	echo "$(doas disklabel vnd0 | grep duid | cut -d ' ' -f 2).a / ffs rw 1 1" |
 		doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
