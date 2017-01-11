@@ -111,7 +111,6 @@ sysclean()
 	done
 	# reset root's password
 	#chpass -a 'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh'
-	#XXX rm /etc/dhclient.conf ?
 }
 
 if [[ $(id -u) != 0 ]]; then
