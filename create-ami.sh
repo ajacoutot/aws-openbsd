@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/ksh
 #
 # Copyright (c) 2015, 2016 Antoine Jacoutot <ajacoutot@openbsd.org>
 #
@@ -23,6 +23,7 @@
 # XXX obootstrap (KVM (vio0, sd0a)
 # XXX hotplugd xnf1...
 # XXX drop ec2-tools dependency
+# XXX fsck failure at boot
 
 _ARCH=$(uname -m)
 _DEPS="awscli ec2-api-tools"
@@ -66,14 +67,13 @@ usage() {
 	echo "       -i \"/path/to/image\"" >&2
 	echo "       -n only create the RAW image (not the AMI)" >&2
 	echo "       -r \"release\" (e.g 6.0; default to current)" >&2
-	echo "       -s \"size\" (in GB; default to 8)" >&2
+	echo "       -s \"size\" (in GB; default to 4)" >&2
 	exit 1
 }
 
 create_img() {
 	_WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
-	local _LOG=${_WRKDIR}/log
-	local _MNT=${_WRKDIR}/mnt
+	local _LOG=${_WRKDIR}/log _MNT=${_WRKDIR}/mnt _p
 	local _REL=${RELEASE:-$(uname -r)}
 	_REL=$(echo ${_REL} | tr -d '.')
 	local _VNDEV=$(doas vnconfig -l | grep 'not in use' | head -1 | cut -d ':' -f1)
@@ -92,16 +92,39 @@ create_img() {
 	echo "===> creating image container"
 	vmctl create ${_IMG} -s ${IMGSIZE}G >${_LOG} 2>&1
 
-	echo "===> creating image filesystem"
+	echo "===> creating and mounting image filesystem"
 	doas vnconfig ${_VNDEV} ${_IMG} >${_LOG} 2>&1
 	doas fdisk -iy ${_VNDEV} >${_LOG} 2>&1
+	if ((IMGSIZE >= 4)); then
+		# swap is only here to allow automatic disk allocation
+		cat <<'EOF' >${_WRKDIR}/disklabel
+/		128M
+swap		128M
+/tmp		128M
+/var		128M
+/usr		1024M
+/usr/local	2048M
+/home		128M-*
+EOF
+	doas disklabel -Aw -T ${_WRKDIR}/disklabel ${_VNDEV} >${_LOG} 2>&1
+	for _p in a d e f g h; do
+		doas newfs /dev/r${_VNDEV}${_p} >${_LOG} 2>&1
+	done
+		doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
+		doas install -d ${_MNT}/{tmp,var,usr,home} >${_LOG} 2>&1
+		doas mount /dev/${_VNDEV}d ${_MNT}/tmp >${_LOG} 2>&1
+		doas mount /dev/${_VNDEV}e ${_MNT}/var >${_LOG} 2>&1
+		doas mount /dev/${_VNDEV}f ${_MNT}/usr >${_LOG} 2>&1
+		doas install -d ${_MNT}/usr/local >${_LOG} 2>&1
+		doas mount /dev/${_VNDEV}g ${_MNT}/usr/local >${_LOG} 2>&1
+		doas mount /dev/${_VNDEV}h ${_MNT}/home >${_LOG} 2>&1
 #	doas disklabel -F ${_WRKDIR}/fstab -w -A vnd0 >${_LOG} 2>&1
 #	doas disklabel -Aw ${_VNDEV} >${_LOG} 2>&1
-	printf "a\n\n\n\n\nq\n\n" | doas disklabel -E ${_VNDEV} >${_LOG} 2>&1
-	doas newfs /dev/r${_VNDEV}a >${_LOG} 2>&1
-
-	echo "===> mounting image"
-	doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
+	else
+		printf "a\n\n\n\n\nq\n\n" | doas disklabel -E ${_VNDEV} >${_LOG} 2>&1
+		doas newfs /dev/r${_VNDEV}a >${_LOG} 2>&1
+		doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
+	fi
 
 	echo "===> fetching sets from ${MIRROR:##*//} (can take some time)"
 	( cd ${_WRKDIR} && \
@@ -148,8 +171,15 @@ create_img() {
 	if [[ ! -d ${MIRROR:##*//} ]]; then
 		echo "installpath = ${MIRROR:##*//}" | doas tee ${_MNT}/etc/pkg.conf >${_LOG} 2>&1
 	fi
-	echo "$(doas disklabel vnd0 | grep duid | cut -d ' ' -f 2).a / ffs rw 1 1" |
-		doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
+	_duid=$(doas disklabel vnd0 | grep duid | cut -d ' ' -f 2)
+	echo "${_duid}.a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
+	if ((IMGSIZE >= 4)); then
+		echo "${_duid}.h /home ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+		echo "${_duid}.d /tmp ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+		echo "${_duid}.f /usr ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+		echo "${_duid}.g /usr/local ffs rw,wxallowed,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+		echo "${_duid}.e /var ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+	fi
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
@@ -181,6 +211,13 @@ create_img() {
 		'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh' >${_LOG} 2>&1
 
 	echo "===> unmounting the image"
+	if ((IMGSIZE >= 4)); then
+		doas umount ${_MNT}/usr/local >${_LOG} 2>&1
+		doas umount ${_MNT}/usr >${_LOG} 2>&1
+		doas umount ${_MNT}/var >${_LOG} 2>&1
+		doas umount ${_MNT}/home >${_LOG} 2>&1
+		doas umount ${_MNT}/tmp >${_LOG} 2>&1
+	fi
 	doas umount ${_MNT} >${_LOG} 2>&1
 	doas vnconfig -u ${_VNDEV} >${_LOG} 2>&1
 
@@ -198,8 +235,11 @@ create_ami(){
 	local _BUCKETNAME=${_IMGNAME}
 	typeset -l _BUCKETNAME
 
-	[[ -n ${DESCRIPTION} ]] || \
-		local DESCRIPTION="OpenBSD ${RELEASE:-current} ${_ARCH} ${TIMESTAMP}"
+	if [[ -z ${DESCRIPTION} ]]; then
+		local DESCRIPTION="OpenBSD ${RELEASE:-current} ${_ARCH}"
+		[[ -n ${RELEASE} ]] ||
+			DESCRIPTION="${DESCRIPTION} ${TIMESTAMP}"
+	fi
 
 	echo "===> uploading image to S3 (can take some time)"
 	ec2-import-volume \
@@ -269,7 +309,7 @@ create_ami(){
 
 CREATE_AMI=true
 CREATE_IMG=true
-IMGSIZE=8
+IMGSIZE=4
 while getopts d:i:nr:s: arg; do
 	case ${arg} in
 	d)	DESCRIPTION="${OPTARG}";;
