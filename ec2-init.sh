@@ -95,6 +95,8 @@ mock_pf()
 sysclean()
 {
 	local _l
+	# reset root's password
+	#chpass -a 'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh'
 	# remove generated keys
 	rm -f /etc/{iked,isakmpd}/{local.pub,private/local.key} \
 		/etc/ssh/ssh_host_*
@@ -109,8 +111,6 @@ sysclean()
 	for _l in $(find /var/log -type f ! -name '*.gz' -size +0); do
 		>${_l}
 	done
-	# reset root's password
-	#chpass -a 'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh'
 }
 
 if [[ $(id -u) != 0 ]]; then
