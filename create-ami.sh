@@ -18,7 +18,6 @@
 
 # XXX ec2-delete-disk-image
 # XXX function()alise
-# XXX /etc/hostname.ix0?
 # XXX hotplugd xnf1...
 # XXX drop ec2-tools dependency
 # XXX fsck failure at boot
