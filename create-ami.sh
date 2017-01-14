@@ -16,14 +16,13 @@
 #
 # create an OpenBSD image and AMI for AWS
 
-# XXX script vmm(4) to create an "official" installation instead of the extract dance
 # XXX ec2-delete-disk-image
 # XXX function()alise
 # XXX /etc/hostname.ix0?
-# XXX obootstrap (KVM (vio0, sd0a)
 # XXX hotplugd xnf1...
 # XXX drop ec2-tools dependency
 # XXX fsck failure at boot
+# XXX remove _IMGSIZE
 
 _ARCH=$(uname -m)
 _DEPS="awscli ec2-api-tools"
@@ -96,18 +95,18 @@ create_img() {
 	doas vnconfig ${_VNDEV} ${_IMG} >${_LOG} 2>&1
 	doas fdisk -iy ${_VNDEV} >${_LOG} 2>&1
 	if ((IMGSIZE >= 4)); then
-		# swap is only here to allow automatic disk allocation
 		cat <<'EOF' >${_WRKDIR}/disklabel
-/		128M
-swap		128M
-/tmp		128M
-/var		128M
-/usr		1024M
-/usr/local	2048M
-/home		128M-*
+/		80M
+swap		80M
+/tmp		120M
+/var		80M
+/usr		900M
+/usr/X11R6	512M
+/usr/local	2G
+/home		80M-*
 EOF
 	doas disklabel -Aw -T ${_WRKDIR}/disklabel ${_VNDEV} >${_LOG} 2>&1
-	for _p in a d e f g h; do
+	for _p in a d e f g h i; do
 		doas newfs /dev/r${_VNDEV}${_p} >${_LOG} 2>&1
 	done
 		doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
@@ -115,9 +114,10 @@ EOF
 		doas mount /dev/${_VNDEV}d ${_MNT}/tmp >${_LOG} 2>&1
 		doas mount /dev/${_VNDEV}e ${_MNT}/var >${_LOG} 2>&1
 		doas mount /dev/${_VNDEV}f ${_MNT}/usr >${_LOG} 2>&1
-		doas install -d ${_MNT}/usr/local >${_LOG} 2>&1
-		doas mount /dev/${_VNDEV}g ${_MNT}/usr/local >${_LOG} 2>&1
-		doas mount /dev/${_VNDEV}h ${_MNT}/home >${_LOG} 2>&1
+		doas install -d ${_MNT}/usr/{X11R6,local} >${_LOG} 2>&1
+		doas mount /dev/${_VNDEV}g ${_MNT}/usr/X11R6 >${_LOG} 2>&1
+		doas mount /dev/${_VNDEV}h ${_MNT}/usr/local >${_LOG} 2>&1
+		doas mount /dev/${_VNDEV}i ${_MNT}/home >${_LOG} 2>&1
 #	doas disklabel -F ${_WRKDIR}/fstab -w -A vnd0 >${_LOG} 2>&1
 #	doas disklabel -Aw ${_VNDEV} >${_LOG} 2>&1
 	else
@@ -172,12 +172,16 @@ EOF
 		echo "installpath = ${MIRROR:##*//}" | doas tee ${_MNT}/etc/pkg.conf >${_LOG} 2>&1
 	fi
 	_duid=$(doas disklabel vnd0 | grep duid | cut -d ' ' -f 2)
+	if ((IMGSIZE >= 4)); then
+		echo "${_duid}.b none swap sw" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
+	fi
 	echo "${_duid}.a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
 	if ((IMGSIZE >= 4)); then
-		echo "${_duid}.h /home ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+		echo "${_duid}.i /home ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
 		echo "${_duid}.d /tmp ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
 		echo "${_duid}.f /usr ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-		echo "${_duid}.g /usr/local ffs rw,wxallowed,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+		echo "${_duid}.g /usr/X11R6 ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+		echo "${_duid}.h /usr/local ffs rw,wxallowed,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
 		echo "${_duid}.e /var ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
 	fi
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
@@ -212,6 +216,7 @@ EOF
 
 	echo "===> unmounting the image"
 	if ((IMGSIZE >= 4)); then
+		doas umount ${_MNT}/usr/X11R6 >${_LOG} 2>&1
 		doas umount ${_MNT}/usr/local >${_LOG} 2>&1
 		doas umount ${_MNT}/usr >${_LOG} 2>&1
 		doas umount ${_MNT}/var >${_LOG} 2>&1
@@ -273,7 +278,7 @@ create_ami(){
 	#ec2-delete-disk-image
 
 	echo
-	echo "===> creating snapshot n region ${AWS_REGION} (can take some time)"
+	echo "===> creating snapshot in region ${AWS_REGION} (can take some time)"
 	ec2-create-snapshot \
 	       -O "${AWS_ACCESS_KEY_ID}" \
 	       -W "${AWS_SECRET_ACCESS_KEY}" \
