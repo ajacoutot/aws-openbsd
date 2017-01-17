@@ -238,6 +238,11 @@ create_ami(){
 	local _IMGNAME=${_IMG##*/}
 	local _BUCKETNAME=${_IMGNAME}
 	typeset -l _BUCKETNAME
+	[[ -z $TMPDIR ]] || export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
+	[[ -z $https_proxy ]] || {
+		local host_port=${https_proxy##*/}
+		export EC2_JVM_ARGS="-Dhttps.proxyHost=${host_port%%:*} -Dhttps.proxyPort=${host_port##*:}"
+	}
 
 	if [[ -z ${DESCRIPTION} ]]; then
 		local DESCRIPTION="OpenBSD ${RELEASE:-current} ${_ARCH}"
