@@ -63,9 +63,7 @@ ec2_userdata()
 {
 	local _userdata="$(mock user-data)"
 	[[ ${_userdata%${_userdata#??}} == "#!" ]] || return 0
-	local _script="$(mktemp -p /tmp -t aws-user-data.XXXXXXXXXX)"
-	print -- "${_userdata}" >${_script} && chmod u+x ${_script} &&
-		/bin/sh -c ${_script} && rm ${_script}
+	eval "${_userdata}"
 }
 
 mock()
