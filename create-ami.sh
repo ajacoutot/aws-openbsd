@@ -330,6 +330,11 @@ while getopts d:i:nr:s: arg; do
 	esac
 done
 
+[[ -n ${JAVA_HOME} ]] || export JAVA_HOME=$(javaPathHelper -h ec2-api-tools)
+[[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
+which ec2-import-volume >/dev/null 2>&1 || \
+	export PATH=${EC2_HOME}/bin:${PATH}
+
 if ${CREATE_AMI}; then
 	if [[ -z ${AWS_ACCESS_KEY_ID} || -z ${AWS_SECRET_ACCESS_KEY} ]]; then
 		echo "${0##*/}: AWS credentials aren't set"
@@ -340,11 +345,6 @@ if ${CREATE_AMI}; then
 		exit 1
 	fi
 fi
-
-[[ -n ${JAVA_HOME} ]] || export JAVA_HOME=$(javaPathHelper -h ec2-api-tools)
-[[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
-which ec2-import-volume >/dev/null 2>&1 || \
-	export PATH=${EC2_HOME}/bin:${PATH}
 
 if ${CREATE_IMG}; then
 	create_img
