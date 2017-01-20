@@ -104,7 +104,7 @@ sectors/cylinder: 16065
 cylinders: 522
 total sectors: 8388608
 boundstart: 64
-boundend: 8388608
+boundend: 8385930
 
 16 partitions:
 #                size           offset  fstype [fsize bsize   cpg]
@@ -181,7 +181,7 @@ EOF
 	fi
 	_duid=$(doas disklabel vnd0 | grep duid | cut -d ' ' -f 2)
 	echo "${_duid}.b none swap sw" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
-	echo "${_duid}.a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
+	echo "${_duid}.a / ffs rw 1 1" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
 	echo "${_duid}.i /home ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
 	echo "${_duid}.d /tmp ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
 	echo "${_duid}.f /usr ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
