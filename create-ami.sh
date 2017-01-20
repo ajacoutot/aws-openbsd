@@ -21,7 +21,6 @@
 # XXX hotplugd xnf1...
 # XXX drop ec2-tools dependency
 # XXX fsck failure at boot
-# XXX remove _IMGSIZE
 
 _ARCH=$(uname -m)
 _DEPS="awscli ec2-api-tools"
@@ -65,7 +64,6 @@ usage() {
 	echo "       -i \"/path/to/image\"" >&2
 	echo "       -n only create the RAW image (not the AMI)" >&2
 	echo "       -r \"release\" (e.g 6.0; default to current)" >&2
-	echo "       -s \"size\" (in GB; default to 4)" >&2
 	exit 1
 }
 
@@ -88,42 +86,53 @@ create_img() {
 	trap "cat ${_LOG}" ERR
 
 	echo "===> creating image container"
-	vmctl create ${_IMG} -s ${IMGSIZE}G >${_LOG} 2>&1
+	vmctl create ${_IMG} -s 4G >${_LOG} 2>&1
 
+	# matches >7G disklabel(8) automatic allocation minimum sizes except for
+	# /var (80M->256M) to accomodate syspatch(8)
 	echo "===> creating and mounting image filesystem"
 	doas vnconfig ${_VNDEV} ${_IMG} >${_LOG} 2>&1
-	doas fdisk -iy ${_VNDEV} >${_LOG} 2>&1
-	if ((IMGSIZE >= 4)); then
-		cat <<'EOF' >${_WRKDIR}/disklabel
-/		80M
-swap		80M
-/tmp		120M
-/var		80M
-/usr		900M
-/usr/X11R6	512M
-/usr/local	2G
-/home		80M-*
+	doas fdisk -c 522 -h 255 -s 63 -yi ${_VNDEV} >${_LOG} 2>&1
+	cat <<'EOF' >${_WRKDIR}/disklabel
+type: SCSI
+disk: SCSI disk
+label: EC2 root device
+bytes/sector: 512
+sectors/track: 63
+tracks/cylinder: 255
+sectors/cylinder: 16065
+cylinders: 522
+total sectors: 8388608
+boundstart: 64
+boundend: 8388608
+
+16 partitions:
+#                size           offset  fstype [fsize bsize   cpg]
+  a:           176640               64  4.2BSD   2048 16384     1 
+  b:           160661           176704    swap                    
+  c:          8388608                0  unused                    
+  d:           257024           337376  4.2BSD   2048 16384     1 
+  e:           514080           594400  4.2BSD   2048 16384     1 
+  f:          1831392          1108480  4.2BSD   2048 16384     1 
+  g:          1044224          2939872  4.2BSD   2048 16384     1 
+  h:          4192960          3984096  4.2BSD   2048 16384     1 
+  i:           211552          8177056  4.2BSD   2048 16384     1
 EOF
-	doas disklabel -Aw -T ${_WRKDIR}/disklabel ${_VNDEV} >${_LOG} 2>&1
+	doas disklabel -R ${_VNDEV} ${_WRKDIR}/disklabel >${_LOG} 2>&1
+#	doas disklabel -F ${_WRKDIR}/fstab -w -A vnd0 >${_LOG} 2>&1
+#	doas disklabel -Aw ${_VNDEV} >${_LOG} 2>&1
 	for _p in a d e f g h i; do
 		doas newfs /dev/r${_VNDEV}${_p} >${_LOG} 2>&1
 	done
-		doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
-		doas install -d ${_MNT}/{tmp,var,usr,home} >${_LOG} 2>&1
-		doas mount /dev/${_VNDEV}d ${_MNT}/tmp >${_LOG} 2>&1
-		doas mount /dev/${_VNDEV}e ${_MNT}/var >${_LOG} 2>&1
-		doas mount /dev/${_VNDEV}f ${_MNT}/usr >${_LOG} 2>&1
-		doas install -d ${_MNT}/usr/{X11R6,local} >${_LOG} 2>&1
-		doas mount /dev/${_VNDEV}g ${_MNT}/usr/X11R6 >${_LOG} 2>&1
-		doas mount /dev/${_VNDEV}h ${_MNT}/usr/local >${_LOG} 2>&1
-		doas mount /dev/${_VNDEV}i ${_MNT}/home >${_LOG} 2>&1
-#	doas disklabel -F ${_WRKDIR}/fstab -w -A vnd0 >${_LOG} 2>&1
-#	doas disklabel -Aw ${_VNDEV} >${_LOG} 2>&1
-	else
-		printf "a\n\n\n\n\nq\n\n" | doas disklabel -E ${_VNDEV} >${_LOG} 2>&1
-		doas newfs /dev/r${_VNDEV}a >${_LOG} 2>&1
-		doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
-	fi
+	doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
+	doas install -d ${_MNT}/{tmp,var,usr,home} >${_LOG} 2>&1
+	doas mount /dev/${_VNDEV}d ${_MNT}/tmp >${_LOG} 2>&1
+	doas mount /dev/${_VNDEV}e ${_MNT}/var >${_LOG} 2>&1
+	doas mount /dev/${_VNDEV}f ${_MNT}/usr >${_LOG} 2>&1
+	doas install -d ${_MNT}/usr/{X11R6,local} >${_LOG} 2>&1
+	doas mount /dev/${_VNDEV}g ${_MNT}/usr/X11R6 >${_LOG} 2>&1
+	doas mount /dev/${_VNDEV}h ${_MNT}/usr/local >${_LOG} 2>&1
+	doas mount /dev/${_VNDEV}i ${_MNT}/home >${_LOG} 2>&1
 
 	echo "===> fetching sets from ${MIRROR:##*//} (can take some time)"
 	( cd ${_WRKDIR} && \
@@ -171,18 +180,14 @@ EOF
 		echo "installpath = ${MIRROR:##*//}" | doas tee ${_MNT}/etc/pkg.conf >${_LOG} 2>&1
 	fi
 	_duid=$(doas disklabel vnd0 | grep duid | cut -d ' ' -f 2)
-	if ((IMGSIZE >= 4)); then
-		echo "${_duid}.b none swap sw" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
-	fi
+	echo "${_duid}.b none swap sw" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
 	echo "${_duid}.a / ffs rw 1 1" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
-	if ((IMGSIZE >= 4)); then
-		echo "${_duid}.i /home ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-		echo "${_duid}.d /tmp ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-		echo "${_duid}.f /usr ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-		echo "${_duid}.g /usr/X11R6 ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-		echo "${_duid}.h /usr/local ffs rw,wxallowed,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-		echo "${_duid}.e /var ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-	fi
+	echo "${_duid}.i /home ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+	echo "${_duid}.d /tmp ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+	echo "${_duid}.f /usr ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+	echo "${_duid}.g /usr/X11R6 ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+	echo "${_duid}.h /usr/local ffs rw,wxallowed,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
+	echo "${_duid}.e /var ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
@@ -197,31 +202,13 @@ EOF
 	doas chroot ${_MNT} env -i ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
 	doas chroot ${_MNT} env -i rcctl disable sndiod >${_LOG} 2>&1
 
-	# XXX not technically needed
-	#echo "===> removing cruft from the image"
-	#doas rm /etc/random.seed /var/db/host.random
-	doas rm -f ${_MNT}/etc/isakmpd/private/local.key \
-		${_MNT}/etc/isakmpd/local.pub \
-		${_MNT}/etc/iked/private/local.key \
-		${_MNT}/etc/isakmpd/local.pub \
-		${_MNT}/etc/ssh/ssh_host_* \
-		${_MNT}/var/db/dhclient.leases.* >${_LOG} 2>&1
-	doas rm -rf ${_MNT}/tmp/{.[!.],}* >${_LOG} 2>&1
-
-	# XXX not technically needed
-	#echo "===> disabling root password"
-	doas chroot ${_MNT} env -i chpass -a \
-		'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh' >${_LOG} 2>&1
-
 	echo "===> unmounting the image"
-	if ((IMGSIZE >= 4)); then
-		doas umount ${_MNT}/usr/X11R6 >${_LOG} 2>&1
-		doas umount ${_MNT}/usr/local >${_LOG} 2>&1
-		doas umount ${_MNT}/usr >${_LOG} 2>&1
-		doas umount ${_MNT}/var >${_LOG} 2>&1
-		doas umount ${_MNT}/home >${_LOG} 2>&1
-		doas umount ${_MNT}/tmp >${_LOG} 2>&1
-	fi
+	doas umount ${_MNT}/usr/X11R6 >${_LOG} 2>&1
+	doas umount ${_MNT}/usr/local >${_LOG} 2>&1
+	doas umount ${_MNT}/usr >${_LOG} 2>&1
+	doas umount ${_MNT}/var >${_LOG} 2>&1
+	doas umount ${_MNT}/home >${_LOG} 2>&1
+	doas umount ${_MNT}/tmp >${_LOG} 2>&1
 	doas umount ${_MNT} >${_LOG} 2>&1
 	doas vnconfig -u ${_VNDEV} >${_LOG} 2>&1
 
@@ -256,7 +243,7 @@ create_ami(){
 		-f RAW \
 		--region ${AWS_REGION} \
 		-z ${AWS_AZ} \
-		-s ${IMGSIZE} \
+		-s 4 \
 		-d ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
 		-W "${AWS_SECRET_ACCESS_KEY}" \
@@ -318,14 +305,12 @@ create_ami(){
 
 CREATE_AMI=true
 CREATE_IMG=true
-IMGSIZE=4
-while getopts d:i:nr:s: arg; do
+while getopts d:i:nr: arg; do
 	case ${arg} in
 	d)	DESCRIPTION="${OPTARG}";;
 	i)	CREATE_IMG=false; _IMG="${OPTARG}";;
 	n)	CREATE_AMI=false;;
 	r)	RELEASE="${OPTARG}";;
-	s)	IMGSIZE="${OPTARG}";;
 	*)	usage;;
 	esac
 done
