@@ -100,8 +100,8 @@ sysclean()
 	# remove generated keys
 	rm -f /etc/{iked,isakmpd}/{local.pub,private/local.key} \
 		/etc/ssh/ssh_host_*
-	# remove old dhcp leases
-	rm /var/db/dhclient.leases.xnf[0-99]
+	# remove dhcp client configuration and old leases
+	rm -f /etc/dhclient.conf /var/db/dhclient.leases.xnf[0-99]
 	# remove cruft from /tmp
 	rm -rf /tmp/{.[!.],}*
 	# reset entropy files
