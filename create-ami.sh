@@ -221,13 +221,13 @@ EOF
 	rm -f ${_LOG}
 }
 
-create_ami(){
+create_ami() {
 	local _IMGNAME=${_IMG##*/}
 	local _BUCKETNAME=${_IMGNAME}
 	typeset -l _BUCKETNAME
-	[[ -z $TMPDIR ]] || export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
-	[[ -z $https_proxy ]] || {
-		local host_port=${https_proxy##*/}
+	[[ -z ${TMPDIR} ]] || export _JAVA_OPTIONS=-Djava.io.tmpdir=${TMPDIR}
+	[[ -z ${http_proxy} ]] || {
+		local host_port=${http_proxy##*/}
 		export EC2_JVM_ARGS="-Dhttps.proxyHost=${host_port%%:*} -Dhttps.proxyPort=${host_port##*:}"
 	}
 
@@ -317,8 +317,7 @@ done
 
 [[ -n ${JAVA_HOME} ]] || export JAVA_HOME=$(javaPathHelper -h ec2-api-tools)
 [[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
-which ec2-import-volume >/dev/null 2>&1 || \
-	export PATH=${EC2_HOME}/bin:${PATH}
+which ec2-import-volume >/dev/null 2>&1 || export PATH=${EC2_HOME}/bin:${PATH}
 
 if ${CREATE_AMI}; then
 	if [[ -z ${AWS_ACCESS_KEY_ID} || -z ${AWS_SECRET_ACCESS_KEY} ]]; then
