@@ -16,12 +16,6 @@
 #
 # create an OpenBSD image and AMI for AWS
 
-# XXX ec2-delete-disk-image
-# XXX function()alise
-# XXX hotplugd xnf1...
-# XXX drop ec2-tools dependency
-# XXX fsck failure at boot
-
 set -e
 umask 022
 
@@ -188,6 +182,7 @@ EOF
 		${_MNT}/etc/ttys
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf
+	# XXX hotplugd xnf{1,2,3}?
 	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0
 	echo "!/usr/local/libexec/ec2-init" |
 		doas tee -a ${_MNT}/etc/hostname.xnf0
@@ -256,6 +251,7 @@ create_ami() {
 		sleep 10
 	done
 
+	# XXX
 	#echo
 	#echo "deleting local and remote disk images"
 	#rm -rf ${_WRKDIR}
@@ -313,6 +309,8 @@ if ${CREATE_AMI}; then
 	[[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
 	which ec2-import-volume >/dev/null 2>&1 ||
 		export PATH=${EC2_HOME}/bin:${PATH}
+	# XXX seems the aws cli does more checking on the image than the ec2
+	# tools, preventing creating an OpenBSD AMI; so we need java for now :-(
 	if ! type ec2-import-volume >/dev/null; then
 		echo "${0##*/}: needs the EC2 CLI tools (\"ec2-api-tools\")"
 		exit 1
