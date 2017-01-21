@@ -22,8 +22,8 @@
 # XXX drop ec2-tools dependency
 # XXX fsck failure at boot
 
-_ARCH=$(uname -m)
-_DEPS="awscli ec2-api-tools"
+set -e
+umask 022
 
 ################################################################################
 
@@ -38,25 +38,15 @@ TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 
 ################################################################################
 
-if [[ ${_ARCH} != @(amd64|i386) ]]; then
-	echo "${0##*/}: only supports amd64 and i386"
+if [[ $(uname -m) != amd64 ]]; then
+	echo "${0##*/}: only supports amd64"
 	exit 1
 fi
-
-for _p in ${_DEPS}; do
-	if ! pkg_info -qe ${_p}-*; then
-		echo "${0##*/}: needs the ${_p} package"
-		exit 1
-	fi
-done
 
 if [[ $(doas ${RANDOM} 2>/dev/null) == 1 ]]; then
 	echo "${0##*/}: needs doas(1) privileges"
 	exit 1
 fi
-
-set -e
-umask 022
 
 usage() {
 	echo "usage: ${0##*/}" >&2
@@ -67,13 +57,19 @@ usage() {
 	exit 1
 }
 
+pr_action() {
+	echo "========================================================================="
+	echo "| ${1}"
+	echo "========================================================================="
+}
+
 create_img() {
 	_WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
-	local _LOG=${_WRKDIR}/log _MNT=${_WRKDIR}/mnt _p
-	local _REL=${RELEASE:-$(uname -r)}
+	_IMG=${_WRKDIR}/openbsd-${RELEASE:-current}-amd64-${TIMESTAMP}
+	local _MNT=${_WRKDIR}/mnt _REL=${RELEASE:-$(uname -r)} _p
+	local _VNDEV=$(doas vnconfig -l | grep 'not in use' | head -1 |
+		cut -d ':' -f1)
 	_REL=$(echo ${_REL} | tr -d '.')
-	local _VNDEV=$(doas vnconfig -l | grep 'not in use' | head -1 | cut -d ':' -f1)
-	_IMG=${_WRKDIR}/openbsd-${RELEASE:-current}-${_ARCH}-${TIMESTAMP}
 
 	if [[ -z ${_VNDEV} ]]; then
 		echo "${0##*/}: no vnd(4) device available"
@@ -81,18 +77,17 @@ create_img() {
 	fi
 
 	mkdir -p ${_MNT}
-	touch ${_LOG}
 
-	trap "cat ${_LOG}" ERR
+	pr_action "creating image container"
+	vmctl create ${_IMG} -s 4G
 
-	echo "===> creating image container"
-	vmctl create ${_IMG} -s 4G >${_LOG} 2>&1
-
-	# matches >7G disklabel(8) automatic allocation minimum sizes except for
-	# /var (80M->256M) to accomodate syspatch(8)
-	echo "===> creating and mounting image filesystem"
-	doas vnconfig ${_VNDEV} ${_IMG} >${_LOG} 2>&1
-	doas fdisk -c 522 -h 255 -s 63 -yi ${_VNDEV} >${_LOG} 2>&1
+	# matches >7G disklabel(8) automatic allocation minimum sizes (and not
+	# disklabel -Aw ${_VNDEV}) except for /var (80M->256M) (to accomodate
+	# syspatch(8)); we hardcode a 4G image because it's easy to extend /home
+	# if we need more space for specialized usage (or even add a new EBS)
+	pr_action "creating and mounting image filesystem"
+	doas vnconfig ${_VNDEV} ${_IMG}
+	doas fdisk -c 522 -h 255 -s 63 -yi ${_VNDEV}
 	cat <<'EOF' >${_WRKDIR}/disklabel
 type: SCSI
 disk: SCSI disk
@@ -118,107 +113,104 @@ boundend: 8385930
   h:          4192960          3984096  4.2BSD   2048 16384     1 
   i:           211552          8177056  4.2BSD   2048 16384     1
 EOF
-	doas disklabel -R ${_VNDEV} ${_WRKDIR}/disklabel >${_LOG} 2>&1
-#	doas disklabel -F ${_WRKDIR}/fstab -w -A vnd0 >${_LOG} 2>&1
-#	doas disklabel -Aw ${_VNDEV} >${_LOG} 2>&1
+	doas disklabel -R ${_VNDEV} ${_WRKDIR}/disklabel
 	for _p in a d e f g h i; do
-		doas newfs /dev/r${_VNDEV}${_p} >${_LOG} 2>&1
+		doas newfs /dev/r${_VNDEV}${_p}
 	done
-	doas mount /dev/${_VNDEV}a ${_MNT} >${_LOG} 2>&1
-	doas install -d ${_MNT}/{tmp,var,usr,home} >${_LOG} 2>&1
-	doas mount /dev/${_VNDEV}d ${_MNT}/tmp >${_LOG} 2>&1
-	doas mount /dev/${_VNDEV}e ${_MNT}/var >${_LOG} 2>&1
-	doas mount /dev/${_VNDEV}f ${_MNT}/usr >${_LOG} 2>&1
-	doas install -d ${_MNT}/usr/{X11R6,local} >${_LOG} 2>&1
-	doas mount /dev/${_VNDEV}g ${_MNT}/usr/X11R6 >${_LOG} 2>&1
-	doas mount /dev/${_VNDEV}h ${_MNT}/usr/local >${_LOG} 2>&1
-	doas mount /dev/${_VNDEV}i ${_MNT}/home >${_LOG} 2>&1
+	doas mount /dev/${_VNDEV}a ${_MNT}
+	doas install -d ${_MNT}/{tmp,var,usr,home}
+	doas mount /dev/${_VNDEV}d ${_MNT}/tmp
+	doas mount /dev/${_VNDEV}e ${_MNT}/var
+	doas mount /dev/${_VNDEV}f ${_MNT}/usr
+	doas install -d ${_MNT}/usr/{X11R6,local}
+	doas mount /dev/${_VNDEV}g ${_MNT}/usr/X11R6
+	doas mount /dev/${_VNDEV}h ${_MNT}/usr/local
+	doas mount /dev/${_VNDEV}i ${_MNT}/home
 
-	echo "===> fetching sets from ${MIRROR:##*//} (can take some time)"
-	( cd ${_WRKDIR} && \
-		ftp -V ${MIRROR}/pub/OpenBSD/${RELEASE:-snapshots}/${_ARCH}/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} \
-		>${_LOG} 2>&1 )
+	pr_action "fetching sets from ${MIRROR:##*//}"
+	( cd ${_WRKDIR} &&
+		ftp -V ${MIRROR}/pub/OpenBSD/${RELEASE:-snapshots}/amd64/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} )
 
-	echo "===> fetching ec2-init"
-	ftp -MV -o ${_WRKDIR}/ec2-init \
+	pr_action "fetching ec2-init"
+	ftp -V -o ${_WRKDIR}/ec2-init \
 		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
 
-	echo "===> extracting sets"
-	for i in ${_WRKDIR}/*${_REL}.tgz ${_MNT}/var/sysmerge/{,x}etc.tgz; do \
-		doas tar xzphf $i -C ${_MNT} >${_LOG} 2>&1
+	pr_action "extracting sets"
+	for i in ${_WRKDIR}/*${_REL}.tgz ${_MNT}/var/sysmerge/{,x}etc.tgz; do
+		doas tar xzphf $i -C ${_MNT}
 	done
 
-	echo "===> installing MP kernel"
-	doas mv ${_WRKDIR}/bsd* ${_MNT} >${_LOG} 2>&1
-	doas mv ${_MNT}/bsd ${_MNT}/bsd.sp >${_LOG} 2>&1
-	doas mv ${_MNT}/bsd.mp ${_MNT}/bsd >${_LOG} 2>&1
-	doas chown 0:0 ${_MNT}/bsd* >${_LOG} 2>&1
+	pr_action "installing MP kernel"
+	doas mv ${_WRKDIR}/bsd* ${_MNT}
+	doas mv ${_MNT}/bsd ${_MNT}/bsd.sp
+	doas mv ${_MNT}/bsd.mp ${_MNT}/bsd
+	doas chown 0:0 ${_MNT}/bsd*
 
-	echo "===> installing ec2-init"
+	pr_action "installing ec2-init"
 	doas install -m 0555 -o root -g bin ${_WRKDIR}/ec2-init \
-		${_MNT}/usr/local/libexec/ec2-init >${_LOG} 2>&1
+		${_MNT}/usr/local/libexec/ec2-init
 
-	echo "===> removing downloaded files"
-	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/ec2-init >${_LOG} 2>&1
+	pr_action "removing downloaded files"
+	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/ec2-init
 
-	echo "===> creating devices"
-	( cd ${_MNT}/dev && doas sh ./MAKEDEV all >${_LOG} 2>&1 )
+	pr_action "creating devices"
+	( cd ${_MNT}/dev && doas sh ./MAKEDEV all )
 
-	echo "===> storing entropy for the initial boot"
+	pr_action "storing entropy for the initial boot"
 	doas dd if=/dev/random of=${_MNT}/var/db/host.random bs=65536 count=1 \
-		status=none >${_LOG} 2>&1
+		status=none
 	doas dd if=/dev/random of=${_MNT}/etc/random.seed bs=512 count=1 \
-		status=none >${_LOG} 2>&1
-	doas chmod 600 ${_MNT}/var/db/host.random ${_MNT}/etc/random.seed \
-		>${_LOG} 2>&1
+		status=none
+	doas chmod 600 ${_MNT}/var/db/host.random ${_MNT}/etc/random.seed
 
-	echo "===> installing master boot record"
-	doas installboot -r ${_MNT} ${_VNDEV} >${_LOG} 2>&1
+	pr_action "installing master boot record"
+	doas installboot -r ${_MNT} ${_VNDEV}
 
-	echo "===> configuring the image"
-	if [[ ! -d ${MIRROR:##*//} ]]; then
-		echo "installpath = ${MIRROR:##*//}" | doas tee ${_MNT}/etc/pkg.conf >${_LOG} 2>&1
-	fi
-	_duid=$(doas disklabel vnd0 | grep duid | cut -d ' ' -f 2)
-	echo "${_duid}.b none swap sw" | doas tee ${_MNT}/etc/fstab >${_LOG} 2>&1
-	echo "${_duid}.a / ffs rw 1 1" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-	echo "${_duid}.i /home ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-	echo "${_duid}.d /tmp ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-	echo "${_duid}.f /usr ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-	echo "${_duid}.g /usr/X11R6 ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-	echo "${_duid}.h /usr/local ffs rw,wxallowed,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-	echo "${_duid}.e /var ffs rw,nodev,nosuid 1 2" | doas tee -a ${_MNT}/etc/fstab >${_LOG} 2>&1
-	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," ${_MNT}/etc/ttys >${_LOG} 2>&1
-	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf >${_LOG} 2>&1
-	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf >${_LOG} 2>&1
-	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
-	echo "!/usr/local/libexec/ec2-init" | \
-		doas tee -a ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
-	doas chmod 0640 ${_MNT}/etc/hostname.xnf0 >${_LOG} 2>&1
-	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts >${_LOG} 2>&1
-	echo "::1\t\tlocalhost" | doas tee -a ${_MNT}/etc/hosts >${_LOG} 2>&1
-	doas chroot ${_MNT} env -i ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
-		>${_LOG} 2>&1
-	doas chroot ${_MNT} env -i ldconfig /usr/local/lib /usr/X11R6/lib >${_LOG} 2>&1
-	doas chroot ${_MNT} env -i rcctl disable sndiod >${_LOG} 2>&1
+	pr_action "configuring the image"
+	# XXX hardcoded
+	echo "https://ftp.fr.openbsd.org/pub/OpenBSD" | doas tee \
+		${_MNT}/etc/installurl
+	_duid=$(doas disklabel ${_VNDEV} | grep duid | cut -d ' ' -f 2)
+	echo "${_duid}.b none swap sw" | doas tee ${_MNT}/etc/fstab
+	echo "${_duid}.a / ffs rw 1 1" | doas tee -a ${_MNT}/etc/fstab
+	echo "${_duid}.i /home ffs rw,nodev,nosuid 1 2" | doas tee -a \
+		${_MNT}/etc/fstab
+	echo "${_duid}.d /tmp ffs rw,nodev,nosuid 1 2" | doas tee -a \
+		${_MNT}/etc/fstab
+	echo "${_duid}.f /usr ffs rw,nodev 1 2" | doas tee -a ${_MNT}/etc/fstab
+	echo "${_duid}.g /usr/X11R6 ffs rw,nodev 1 2" | doas tee -a \
+		${_MNT}/etc/fstab
+	echo "${_duid}.h /usr/local ffs rw,wxallowed,nodev 1 2" | doas tee -a \
+		${_MNT}/etc/fstab
+	echo "${_duid}.e /var ffs rw,nodev,nosuid 1 2" | doas tee -a \
+		${_MNT}/etc/fstab
+	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," \
+		${_MNT}/etc/ttys
+	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf
+	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf
+	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0
+	echo "!/usr/local/libexec/ec2-init" |
+		doas tee -a ${_MNT}/etc/hostname.xnf0
+	doas chmod 0640 ${_MNT}/etc/hostname.xnf0
+	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts
+	echo "::1\t\tlocalhost" | doas tee -a ${_MNT}/etc/hosts
+	doas chroot ${_MNT} env -i ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+	doas chroot ${_MNT} env -i ldconfig /usr/local/lib /usr/X11R6/lib
+	doas chroot ${_MNT} env -i rcctl disable sndiod
 
-	echo "===> unmounting the image"
-	doas umount ${_MNT}/usr/X11R6 >${_LOG} 2>&1
-	doas umount ${_MNT}/usr/local >${_LOG} 2>&1
-	doas umount ${_MNT}/usr >${_LOG} 2>&1
-	doas umount ${_MNT}/var >${_LOG} 2>&1
-	doas umount ${_MNT}/home >${_LOG} 2>&1
-	doas umount ${_MNT}/tmp >${_LOG} 2>&1
-	doas umount ${_MNT} >${_LOG} 2>&1
-	doas vnconfig -u ${_VNDEV} >${_LOG} 2>&1
+	pr_action "unmounting the image"
+	doas umount ${_MNT}/usr/X11R6
+	doas umount ${_MNT}/usr/local
+	doas umount ${_MNT}/usr
+	doas umount ${_MNT}/var
+	doas umount ${_MNT}/home
+	doas umount ${_MNT}/tmp
+	doas umount ${_MNT}
+	doas vnconfig -u ${_VNDEV}
 
-	echo "===> image available at:"
-	echo "     ${_IMG}"
-	echo
+	pr_action "image available at: ${_IMG}"
 
-	trap - ERR
-	rmdir ${_MNT} || true
-	rm -f ${_LOG}
+	rm -r ${_MNT} || true
 }
 
 create_ami() {
@@ -228,16 +220,17 @@ create_ami() {
 	[[ -z ${TMPDIR} ]] || export _JAVA_OPTIONS=-Djava.io.tmpdir=${TMPDIR}
 	[[ -z ${http_proxy} ]] || {
 		local host_port=${http_proxy##*/}
-		export EC2_JVM_ARGS="-Dhttps.proxyHost=${host_port%%:*} -Dhttps.proxyPort=${host_port##*:}"
+		export EC2_JVM_ARGS="-Dhttps.proxyHost=${host_port%%:*} \
+			-Dhttps.proxyPort=${host_port##*:}"
 	}
 
 	if [[ -z ${DESCRIPTION} ]]; then
-		local DESCRIPTION="OpenBSD ${RELEASE:-current} ${_ARCH}"
+		local DESCRIPTION="OpenBSD ${RELEASE:-current} amd64"
 		[[ -n ${RELEASE} ]] ||
 			DESCRIPTION="${DESCRIPTION} ${TIMESTAMP}"
 	fi
 
-	echo "===> uploading image to S3 (can take some time)"
+	pr_action "uploading image to S3 in region ${AWS_REGION}"
 	ec2-import-volume \
 		${_IMG} \
 		-f RAW \
@@ -252,24 +245,23 @@ create_ami() {
 		-b ${_BUCKETNAME}
 
 	echo
-	echo "===> converting image to volume in region ${AWS_REGION} (can take some time)"
+	pr_action "converting image to volume in region ${AWS_REGION}"
 	while [[ -z ${_VOL} ]]; do
 		_VOL=$(ec2-describe-conversion-tasks \
 			-O "${AWS_ACCESS_KEY_ID}" \
 			-W "${AWS_SECRET_ACCESS_KEY}" \
-			--region ${AWS_REGION} 2>/dev/null | \
-			grep "${_IMGNAME}" | \
+			--region ${AWS_REGION} 2>/dev/null |
+			grep "${_IMGNAME}" |
 			grep -Eo "vol-[[:alnum:]]*") || true
 		sleep 10
 	done
 
 	#echo
-	#echo "===> deleting local and remote disk images"
+	#echo "deleting local and remote disk images"
 	#rm -rf ${_WRKDIR}
 	#ec2-delete-disk-image
 
-	echo
-	echo "===> creating snapshot in region ${AWS_REGION} (can take some time)"
+	pr_action "creating snapshot in region ${AWS_REGION}"
 	ec2-create-snapshot \
 	       -O "${AWS_ACCESS_KEY_ID}" \
 	       -W "${AWS_SECRET_ACCESS_KEY}" \
@@ -280,23 +272,19 @@ create_ami() {
 		_SNAP=$(ec2-describe-snapshots \
 			-O "${AWS_ACCESS_KEY_ID}" \
 			-W "${AWS_SECRET_ACCESS_KEY}" \
-			--region ${AWS_REGION} 2>/dev/null | \
-			grep "completed.*${_IMGNAME}" | \
+			--region ${AWS_REGION} 2>/dev/null |
+			grep "completed.*${_IMGNAME}" |
 			grep -Eo "snap-[[:alnum:]]*") || true
 		sleep 10
 	done
 
-	echo
-	echo "===> registering new AMI in region ${AWS_REGION}: ${_IMGNAME}"
-	if [[ "${_ARCH}" == "amd64" ]]; then
-		local _ARCH=x86_64
-	fi
+	pr_action "registering new AMI in region ${AWS_REGION}: ${_IMGNAME}"
 	ec2-register \
 		-n ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		--region ${AWS_REGION} \
-		-a ${_ARCH} \
+		-a x86_64 \
 		-d "${DESCRIPTION}" \
 		--root-device-name /dev/sda1 \
 		--virtualization-type hvm \
@@ -315,17 +303,18 @@ while getopts d:i:nr: arg; do
 	esac
 done
 
-[[ -n ${JAVA_HOME} ]] || export JAVA_HOME=$(javaPathHelper -h ec2-api-tools)
-[[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
-which ec2-import-volume >/dev/null 2>&1 || export PATH=${EC2_HOME}/bin:${PATH}
-
 if ${CREATE_AMI}; then
 	if [[ -z ${AWS_ACCESS_KEY_ID} || -z ${AWS_SECRET_ACCESS_KEY} ]]; then
 		echo "${0##*/}: AWS credentials aren't set"
 		exit 1
 	fi
+	[[ -n ${JAVA_HOME} ]] ||
+		export JAVA_HOME=$(javaPathHelper -h ec2-api-tools) 2>/dev/null
+	[[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
+	which ec2-import-volume >/dev/null 2>&1 ||
+		export PATH=${EC2_HOME}/bin:${PATH}
 	if ! type ec2-import-volume >/dev/null; then
-		echo "${0##*/}: needs the EC2 CLI tools"
+		echo "${0##*/}: needs the EC2 CLI tools (\"ec2-api-tools\")"
 		exit 1
 	fi
 fi
