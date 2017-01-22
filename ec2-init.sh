@@ -21,19 +21,19 @@
 
 # XXXTODO https://cloudinit.readthedocs.org/en/latest/topics/format.html
 
-set -e
+set -eu
 
 ec2_fingerprints()
 {
-	cat <<'EOF-RC' >>/etc/rc.firsttime
-logger -s -t ec2 <<EOF
-#############################################################
------BEGIN SSH HOST KEY FINGERPRINTS-----
-$(for _f in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf ${_f}; done)
------END SSH HOST KEY FINGERPRINTS-----
-#############################################################
-EOF
-EOF-RC
+	cat <<-'EOF-RC' >>/etc/rc.firsttime
+	logger -s -t ec2 <<EOF
+	#############################################################
+	-----BEGIN SSH HOST KEY FINGERPRINTS-----
+	$(for _f in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf ${_f}; done)
+	-----END SSH HOST KEY FINGERPRINTS-----
+	#############################################################
+	EOF
+	EOF-RC
 }
 
 ec2_hostname()
