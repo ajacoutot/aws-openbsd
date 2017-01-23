@@ -182,7 +182,6 @@ EOF
 		${_MNT}/etc/ttys
 	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf
 	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf
-	# XXX hotplugd xnf{1,2,3}?
 	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0
 	echo "!/usr/local/libexec/ec2-init" |
 		doas tee -a ${_MNT}/etc/hostname.xnf0
@@ -192,6 +191,16 @@ EOF
 	doas chroot ${_MNT} env -i ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 	doas chroot ${_MNT} env -i ldconfig /usr/local/lib /usr/X11R6/lib
 	doas chroot ${_MNT} env -i rcctl disable sndiod
+
+#	cat <<'EOF' | doas tee ${_MNT}/etc/hotplugd/attach
+##!/bin/sh
+#
+#case $1 in
+#	3) /sbin/dhclient -i routers $2 ;;
+#esac
+#EOF
+#	doas chmod 0555 ${_MNT}/etc/hotplugd/attach
+#	doas chroot ${_MNT} env -i rcctl enable hotplugd
 
 	pr_action "unmounting the image"
 	doas umount ${_MNT}/usr/X11R6
