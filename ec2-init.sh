@@ -21,7 +21,7 @@
 
 # XXXTODO https://cloudinit.readthedocs.org/en/latest/topics/format.html
 
-set -eu
+set -e
 
 ec2_fingerprints()
 {
