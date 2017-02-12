@@ -59,6 +59,17 @@ ec2_pubkey()
 	print -- "${_pubkey}" >>/root/.ssh/authorized_keys
 }
 
+ec2_ipv6()
+{
+	local _mac="$(mock meta-data/mac)"
+	local _ipv6_addr="$(mock meta-data/network/interfaces/macs/${_mac}/ipv6s)"
+	if [[ -n ${_ipv6_addr} ]]; then
+		/sbin/ifconfig xnf0 inet6 autoconf
+		/sbin/ifconfig xnf0 inet6 ${_ipv6_addr}
+		print -- "rtsol\ninet6 ${_ipv6_addr}" >>/etc/hostname.xnf0
+	fi
+}
+
 ec2_userdata()
 {
 	local _userdata="$(mock user-data)"
@@ -125,6 +136,7 @@ if [[ $(mock meta-data/instance-id) != $(cat /var/db/ec2-init 2>/dev/null) ]]; t
 	ec2_hostname
 	ec2_userdata
 	ec2_fingerprints
+	ec2_ipv6
 	sysclean
 fi
 mock_pf close

@@ -45,7 +45,7 @@ fi
 usage() {
 	echo "usage: ${0##*/}" >&2
 	echo "       -d \"description\"" >&2
-	echo "       -i \"/path/to/image\"" >&2
+	echo "       -i \"/path/to/existing/image\"" >&2
 	echo "       -n only create the RAW image (not the AMI)" >&2
 	echo "       -r \"release\" (e.g 6.0; default to current)" >&2
 	exit 1
@@ -123,14 +123,14 @@ EOF
 
 	pr_action "fetching sets from ${MIRROR:##*//}"
 	( cd ${_WRKDIR} &&
-		ftp -V ${MIRROR}/pub/OpenBSD/${RELEASE:-snapshots}/amd64/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} )
+		ftp -V ${MIRROR}/pub/OpenBSD/${RELEASE:-snapshots}/amd64/{bsd{,.mp,.rd},{base,comp,man}${_REL}.tgz} )
 
 	pr_action "fetching ec2-init"
 	ftp -V -o ${_WRKDIR}/ec2-init \
-		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
+		https://raw.githubusercontent.com/wclarie/aws-openbsd/master/ec2-init.sh
 
 	pr_action "extracting sets"
-	for i in ${_WRKDIR}/*${_REL}.tgz ${_MNT}/var/sysmerge/{,x}etc.tgz; do
+	for i in ${_WRKDIR}/*${_REL}.tgz ${_MNT}/var/sysmerge/etc.tgz; do
 		doas tar xzphf $i -C ${_MNT}
 	done
 
@@ -162,8 +162,10 @@ EOF
 
 	pr_action "configuring the image"
 	# XXX hardcoded
-	echo "https://ftp.fr.openbsd.org/pub/OpenBSD" | doas tee \
+	echo "${MIRROR}/pub/OpenBSD" | doas tee \
 		${_MNT}/etc/installurl
+	echo "installpath = ${MIRROR}" | sed -e 's/https:\/\///g' | doas tee \
+		${_MNT}/etc/pkg.conf
 	_duid=$(doas disklabel ${_VNDEV} | grep duid | cut -d ' ' -f 2)
 	echo "${_duid}.b none swap sw" | doas tee ${_MNT}/etc/fstab
 	echo "${_duid}.a / ffs rw 1 1" | doas tee -a ${_MNT}/etc/fstab
@@ -180,8 +182,9 @@ EOF
 		${_MNT}/etc/fstab
 	doas sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," \
 		${_MNT}/etc/ttys
-	echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf
-	echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf
+	doas sed -i 's/\<on\>/off/g' ${_MNT}/etc/ttys
+	#echo "stty com0 9600" | doas tee ${_MNT}/etc/boot.conf
+	#echo "set tty com0" | doas tee -a ${_MNT}/etc/boot.conf
 	echo "dhcp" | doas tee ${_MNT}/etc/hostname.xnf0
 	echo "!/usr/local/libexec/ec2-init" |
 		doas tee -a ${_MNT}/etc/hostname.xnf0
@@ -189,7 +192,7 @@ EOF
 	echo "127.0.0.1\tlocalhost" | doas tee ${_MNT}/etc/hosts
 	echo "::1\t\tlocalhost" | doas tee -a ${_MNT}/etc/hosts
 	doas chroot ${_MNT} env -i ln -sf /usr/share/zoneinfo/UTC /etc/localtime
-	doas chroot ${_MNT} env -i ldconfig /usr/local/lib /usr/X11R6/lib
+	doas chroot ${_MNT} env -i ldconfig /usr/local/lib
 	doas chroot ${_MNT} env -i rcctl disable sndiod
 
 #	cat <<'EOF' | doas tee ${_MNT}/etc/hotplugd/attach
@@ -211,6 +214,7 @@ EOF
 	doas umount ${_MNT}/tmp
 	doas umount ${_MNT}
 	doas vnconfig -u ${_VNDEV}
+	rm -f ${_WRKDIR}/disklabel
 
 	pr_action "image available at: ${_IMG}"
 
