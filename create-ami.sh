@@ -211,6 +211,7 @@ EOF
 	doas umount ${_MNT}/tmp
 	doas umount ${_MNT}
 	doas vnconfig -u ${_VNDEV}
+	rm ${_WRKDIR}/disklabel
 
 	pr_action "image available at: ${_IMG}"
 
