@@ -209,7 +209,7 @@ EOF
 	doas umount ${_MNT}/var
 	doas umount ${_MNT}/home
 	doas umount ${_MNT}/tmp
-	doas umount ${_MNT}
+	doas umount -f ${_MNT}
 	doas vnconfig -u ${_VNDEV}
 	rm ${_WRKDIR}/disklabel
 
