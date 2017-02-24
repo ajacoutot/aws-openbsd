@@ -221,6 +221,7 @@ EOF
 create_ami() {
 	local _IMGNAME=${_IMG##*/}
 	local _BUCKETNAME=${_IMGNAME}
+	local _VMDK=${_IMG}.vmdk
 	typeset -l _BUCKETNAME
 	[[ -z ${TMPDIR} ]] || export _JAVA_OPTIONS=-Djava.io.tmpdir=${TMPDIR}
 	[[ -z ${http_proxy} ]] || {
@@ -235,10 +236,13 @@ create_ami() {
 			DESCRIPTION="${DESCRIPTION} ${TIMESTAMP}"
 	fi
 
+	pr_action "converting image to stream-based VMDK"
+	vmdktool -v ${_VMDK} ${_IMG}
+
 	pr_action "uploading image to S3 in region ${AWS_REGION}"
 	ec2-import-volume \
-		${_IMG} \
-		-f RAW \
+		${_VMDK} \
+		-f vmdk \
 		--region ${AWS_REGION} \
 		-z ${AWS_AZ} \
 		-s 4 \
@@ -323,6 +327,10 @@ if ${CREATE_AMI}; then
 	# tools, preventing creating an OpenBSD AMI; so we need java for now :-(
 	if ! type ec2-import-volume >/dev/null; then
 		echo "${0##*/}: needs the EC2 CLI tools (\"ec2-api-tools\")"
+		exit 1
+	fi
+	if ! type vmdktool >/dev/null; then
+		echo "${0##*/}: needs the vmdktool"
 		exit 1
 	fi
 fi
