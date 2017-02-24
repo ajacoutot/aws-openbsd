@@ -47,6 +47,7 @@ usage() {
 	echo "       -d \"description\"" >&2
 	echo "       -i \"/path/to/image\"" >&2
 	echo "       -n only create the RAW image (not the AMI)" >&2
+	echo "       -p pause before unmounting image to allow manual configuring" >&2
 	echo "       -r \"release\" (e.g 6.0; default to current)" >&2
 	exit 1
 }
@@ -202,6 +203,11 @@ EOF
 #	doas chmod 0555 ${_MNT}/etc/hotplugd/attach
 #	doas chroot ${_MNT} env -i rcctl enable hotplugd
 
+	[[ $PAUSE = true ]] && {
+		echo -n Do manual configuring under ${_MNT} then hit ENTER to continue.
+		read
+	}
+        
 	pr_action "unmounting the image"
 	doas umount ${_MNT}/usr/X11R6
 	doas umount ${_MNT}/usr/local
@@ -303,11 +309,13 @@ create_ami() {
 
 CREATE_AMI=true
 CREATE_IMG=true
-while getopts d:i:nr: arg; do
+PAUSE=false
+while getopts d:i:npr: arg; do
 	case ${arg} in
 	d)	DESCRIPTION="${OPTARG}";;
 	i)	CREATE_IMG=false; _IMG="${OPTARG}";;
 	n)	CREATE_AMI=false;;
+	p)	PAUSE=true;;
 	r)	RELEASE="${OPTARG}";;
 	*)	usage;;
 	esac
