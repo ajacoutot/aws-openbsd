@@ -186,9 +186,10 @@ EOF
 	chroot ${_MNT} ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 	chroot ${_MNT} ldconfig /usr/local/lib /usr/X11R6/lib
 	chroot ${_MNT} rcctl disable sndiod
-	echo "permit nopass ec2-user" >${_MNT}/etc/doas.conf
 	chroot ${_MNT} useradd -G wheel -L staff -c 'EC2 Default User' -g =uid \
 		-m -u 1000 ec2-user
+	echo "permit nopass ec2-user" >${_MNT}/etc/doas.conf
+	echo "ec2-user" >/root/.forward
 
 #	cat <<-'EOF' >${_MNT}/etc/hotplug/attach
 ##!/bin/sh
