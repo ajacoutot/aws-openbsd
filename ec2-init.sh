@@ -52,11 +52,7 @@ ec2_instanceid()
 ec2_pubkey()
 {
 	local _pubkey="$(mock meta-data/public-keys/0/openssh-key)"
-	install -d -m 0700 /root/.ssh
-	if [[ ! -f /root/.ssh/authorized_keys ]]; then
-		install -m 0600 /dev/null /root/.ssh/authorized_keys
-	fi
-	print -- "${_pubkey}" >>/root/.ssh/authorized_keys
+	print -- "${_pubkey}" >>/home/ec2-user/.ssh/authorized_keys
 }
 
 ec2_userdata()
