@@ -20,16 +20,13 @@ set -e
 umask 022
 
 ################################################################################
-
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:=${AWS_ACCESS_KEY}}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
-AWS_AZ=${AWS_AZ:=eu-west-1a}
 
 MIRROR=${MIRROR:=https://ftp.fr.openbsd.org}
 
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
-
 ################################################################################
 
 if [[ $(uname -m) != amd64 ]]; then
@@ -46,7 +43,7 @@ usage() {
 	echo "usage: ${0##*/}" >&2
 	echo "       -d \"description\"" >&2
 	echo "       -i \"/path/to/image\"" >&2
-	echo "       -n only create the RAW image (not the AMI)" >&2
+	echo "       -n only create the RAW/VMDK images (not the AMI)" >&2
 	echo "       -r \"release\" (e.g 6.0; default to current)" >&2
 	exit 1
 }
@@ -75,20 +72,15 @@ create_img() {
 	pr_action "creating image container"
 	vmctl create ${_IMG} -s 8G
 
-	# matches >7G disklabel(8) automatic allocation minimum sizes (and not
-	# disklabel -Aw ${_VNDEV}) except for /var (80M->256M) (to accomodate
-	# syspatch(8)); we hardcode a 8G image because it's easy to extend /home
-	# if we need more space for specialized usage (or even add a new EBS)
+	# we hardcode a 8G image because it's easy to extend /home if we need
+	# more space for specialized usage (or even add a new EBS)
 	pr_action "creating and mounting image filesystem"
 	vnconfig ${_VNDEV} ${_IMG}
 	fdisk -iy ${_VNDEV}
 	disklabel -F ${_WRKDIR}/fstab -Aw ${_VNDEV}
 	# remove /usr/src and /usr/obj
 	echo "d i\nd j\nd k\na i\n\n\n\nq\n" | disklabel -E ${_VNDEV}
-
-	for _p in a d e f g h i; do
-		newfs /dev/r${_VNDEV}${_p}
-	done
+	for _p in a d e f g h i; do newfs /dev/r${_VNDEV}${_p}; done
 	mount /dev/${_VNDEV}a ${_MNT}
 	install -d ${_MNT}/{tmp,var,usr,home}
 	mount /dev/${_VNDEV}d ${_MNT}/tmp
@@ -121,9 +113,6 @@ create_img() {
 	pr_action "installing ec2-init"
 	install -m 0555 -o root -g bin ${_WRKDIR}/ec2-init \
 		${_MNT}/usr/local/libexec/ec2-init
-
-	pr_action "removing downloaded files"
-	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/ec2-init
 
 	pr_action "creating devices"
 	( cd ${_MNT}/dev && sh ./MAKEDEV all )
@@ -179,11 +168,13 @@ create_img() {
 	umount ${_MNT}/tmp
 	umount ${_MNT}
 	vnconfig -u ${_VNDEV}
-	rm ${_WRKDIR}/fstab
+
+	pr_action "removing downloaded and temporary files"
+	rm ${_WRKDIR}/*${_REL}.tgz ${_WRKDIR}/ec2-init || true # non-fatal
+	rm ${_WRKDIR}/fstab || true # non-fatal
+	rm -r ${_MNT} || true # non-fatal
 
 	pr_action "image available at: ${_IMG}"
-
-	rm -r ${_MNT} || true
 }
 
 create_ami() {
@@ -207,13 +198,12 @@ create_ami() {
 	pr_action "converting image to stream-based VMDK"
 	vmdktool -v ${_VMDK} ${_IMG}
 
-	pr_action "uploading image to S3 in region ${AWS_REGION}"
+	pr_action "uploading image to S3 and converting to volume in region ${AWS_REGION}"
 	ec2-import-volume \
 		${_VMDK} \
 		-f vmdk \
 		--region ${AWS_REGION} \
-		-z ${AWS_AZ} \
-		-s 8 \
+		-z ${AWS_REGION}a \
 		-d ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
 		-W "${AWS_SECRET_ACCESS_KEY}" \
@@ -222,7 +212,6 @@ create_ami() {
 		-b ${_BUCKETNAME}
 
 	echo
-	pr_action "converting image to volume in region ${AWS_REGION}"
 	while [[ -z ${_VOL} ]]; do
 		_VOL=$(ec2-describe-conversion-tasks \
 			-O "${AWS_ACCESS_KEY_ID}" \
