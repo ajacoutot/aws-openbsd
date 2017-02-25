@@ -73,41 +73,19 @@ create_img() {
 	mkdir -p ${_MNT}
 
 	pr_action "creating image container"
-	vmctl create ${_IMG} -s 4G
+	vmctl create ${_IMG} -s 8G
 
 	# matches >7G disklabel(8) automatic allocation minimum sizes (and not
 	# disklabel -Aw ${_VNDEV}) except for /var (80M->256M) (to accomodate
-	# syspatch(8)); we hardcode a 4G image because it's easy to extend /home
+	# syspatch(8)); we hardcode a 8G image because it's easy to extend /home
 	# if we need more space for specialized usage (or even add a new EBS)
 	pr_action "creating and mounting image filesystem"
 	vnconfig ${_VNDEV} ${_IMG}
-	fdisk -c 522 -h 255 -s 63 -yi ${_VNDEV}
-	cat <<'EOF' >${_WRKDIR}/disklabel
-type: SCSI
-disk: SCSI disk
-label: EC2 root device
-bytes/sector: 512
-sectors/track: 63
-tracks/cylinder: 255
-sectors/cylinder: 16065
-cylinders: 522
-total sectors: 8388608
-boundstart: 64
-boundend: 8385930
+	fdisk -iy ${_VNDEV}
+	disklabel -F ${_WRKDIR}/fstab -Aw ${_VNDEV}
+	# remove /usr/src and /usr/obj
+	echo "d i\nd j\nd k\na i\n\n\n\nq\n" | disklabel -E ${_VNDEV}
 
-16 partitions:
-#                size           offset  fstype [fsize bsize   cpg]
-  a:           176640               64  4.2BSD   2048 16384     1 
-  b:           160661           176704    swap                    
-  c:          8388608                0  unused                    
-  d:           257024           337376  4.2BSD   2048 16384     1 
-  e:           514080           594400  4.2BSD   2048 16384     1 
-  f:          1831392          1108480  4.2BSD   2048 16384     1 
-  g:          1044224          2939872  4.2BSD   2048 16384     1 
-  h:          4192960          3984096  4.2BSD   2048 16384     1 
-  i:           211552          8177056  4.2BSD   2048 16384     1
-EOF
-	disklabel -R ${_VNDEV} ${_WRKDIR}/disklabel
 	for _p in a d e f g h i; do
 		newfs /dev/r${_VNDEV}${_p}
 	done
@@ -163,16 +141,17 @@ EOF
 	pr_action "configuring the image"
 	# XXX hardcoded
 	echo "https://ftp.fr.openbsd.org/pub/OpenBSD" >${_MNT}/etc/installurl
-	_duid=$(disklabel ${_VNDEV} | grep duid | cut -d ' ' -f 2)
-	echo "${_duid}.b none swap sw" >${_MNT}/etc/fstab
-	echo "${_duid}.a / ffs rw 1 1" >>${_MNT}/etc/fstab
-	echo "${_duid}.i /home ffs rw,nodev,nosuid 1 2" >>${_MNT}/etc/fstab
-	echo "${_duid}.d /tmp ffs rw,nodev,nosuid 1 2" >>${_MNT}/etc/fstab
-	echo "${_duid}.f /usr ffs rw,nodev 1 2" >>${_MNT}/etc/fstab
-	echo "${_duid}.g /usr/X11R6 ffs rw,nodev 1 2" >>${_MNT}/etc/fstab
-	echo "${_duid}.h /usr/local ffs rw,wxallowed,nodev 1 2" \
-		>>${_MNT}/etc/fstab
-	echo "${_duid}.e /var ffs rw,nodev,nosuid 1 2" >>${_MNT}/etc/fstab
+	sed -e "s#\(/home ffs rw\)#\1,nodev,nosuid#" \
+		-e "s#\(/tmp ffs rw\)#\1,nodev,nosuid#" \
+		-e "s#\(/usr ffs rw\)#\1,nodev#" \
+		-e "s#\(/usr/X11R6 ffs rw\)#\1,nodev#" \
+		-e "s#\(/usr/local ffs rw\)#\1,wxallowed,nodev#" \
+		-e "/\/usr\/obj /d" \
+		-e "/\/usr\/src /d" \
+		-e "s#\(/var ffs rw\)#\1,nodev,nosuid#" \
+		-e "s#\.k #\.i #" \
+		-e '1h;1d;$!H;$!d;G' \
+		${_WRKDIR}/fstab >${_MNT}/etc/fstab
 	sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," \
 		${_MNT}/etc/ttys
 	echo "stty com0 9600" >${_MNT}/etc/boot.conf
@@ -210,7 +189,7 @@ EOF
 	umount ${_MNT}/tmp
 	umount ${_MNT}
 	vnconfig -u ${_VNDEV}
-	rm ${_WRKDIR}/disklabel
+	rm ${_WRKDIR}/fstab
 
 	pr_action "image available at: ${_IMG}"
 
@@ -244,7 +223,7 @@ create_ami() {
 		-f vmdk \
 		--region ${AWS_REGION} \
 		-z ${AWS_AZ} \
-		-s 4 \
+		-s 8 \
 		-d ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
 		-W "${AWS_SECRET_ACCESS_KEY}" \
