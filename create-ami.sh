@@ -168,17 +168,7 @@ create_img() {
 	chroot ${_MNT} useradd -G wheel -L staff -c 'EC2 Default User' -g =uid \
 		-m -u 1000 ec2-user
 	echo "permit nopass ec2-user" >${_MNT}/etc/doas.conf
-	echo "ec2-user" >/root/.forward
-
-#	cat <<-'EOF' >${_MNT}/etc/hotplug/attach
-##!/bin/sh
-#
-#case $1 in
-#	3) /sbin/dhclient -i routers $2 ;;
-#esac
-#EOF
-#	chmod 0555 ${_MNT}/etc/hotplug/attach
-#	chroot ${_MNT} env -i rcctl enable hotplugd
+	echo "ec2-user" >${_MNT}/root/.forward
 
 	pr_action "unmounting the image"
 	umount ${_MNT}/usr/X11R6
