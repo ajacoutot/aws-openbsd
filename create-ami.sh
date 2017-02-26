@@ -72,14 +72,15 @@ create_img() {
 	pr_action "creating image container"
 	vmctl create ${_IMG} -s 8G
 
-	# we hardcode a 8G image because it's easy to extend /home if we need
-	# more space for specialized usage (or even add a new EBS)
+	# default disklabel automatic allocation with the following changes:
+	# - /usr/obj and /usr/src are removed
+	# - /var is extended from 200M to 512M to accomodate binpatches, logs...
+	# - /home is extended with the remaining free space
 	pr_action "creating and mounting image filesystem"
 	vnconfig ${_VNDEV} ${_IMG}
 	fdisk -iy ${_VNDEV}
-	disklabel -F ${_WRKDIR}/fstab -Aw ${_VNDEV}
-	# remove /usr/src and /usr/obj
-	echo "d i\nd j\nd k\na i\n\n\n\nq\n" | disklabel -E ${_VNDEV}
+	echo 'A\nd i\nd j\nd k\nR e\n512M\na i\n\n*\n\n/home\nq\ny\n' | \
+		disklabel -EF ${_WRKDIR}/fstab ${_VNDEV}
 	for _p in a d e f g h i; do newfs /dev/r${_VNDEV}${_p}; done
 	mount /dev/${_VNDEV}a ${_MNT}
 	install -d ${_MNT}/{tmp,var,usr,home}
