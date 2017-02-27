@@ -136,10 +136,7 @@ create_img() {
 		-e "s#\(/usr ffs rw\)#\1,nodev#" \
 		-e "s#\(/usr/X11R6 ffs rw\)#\1,nodev#" \
 		-e "s#\(/usr/local ffs rw\)#\1,wxallowed,nodev#" \
-		-e "/\/usr\/obj /d" \
-		-e "/\/usr\/src /d" \
 		-e "s#\(/var ffs rw\)#\1,nodev,nosuid#" \
-		-e "s#\.k #\.i #" \
 		-e '1h;1d;$!H;$!d;G' \
 		${_WRKDIR}/fstab >${_MNT}/etc/fstab
 	sed -i "s,^tty00.*,tty00	\"/usr/libexec/getty std.9600\"	vt220   on  secure," \
