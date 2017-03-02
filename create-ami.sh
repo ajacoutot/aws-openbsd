@@ -24,7 +24,7 @@ AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:=${AWS_ACCESS_KEY}}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
 
-MIRROR=${MIRROR:=https://mirrors.evowise.com}
+MIRROR=${MIRROR:=https://mirrors.evowise.com/pub/OpenBSD}
 
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 ################################################################################
