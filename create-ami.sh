@@ -24,7 +24,7 @@ AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:=${AWS_ACCESS_KEY}}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
 
-MIRROR=${MIRROR:=https://mirrors.evowise.com}
+MIRROR=${MIRROR:=https://mirrors.evowise.com/pub/OpenBSD}
 
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 ################################################################################
@@ -94,7 +94,7 @@ create_img() {
 
 	pr_action "fetching sets from ${MIRROR:##*//}"
 	( cd ${_WRKDIR} &&
-		ftp -V ${MIRROR}/pub/OpenBSD/${RELEASE:-snapshots}/amd64/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} )
+		ftp -V ${MIRROR}/${RELEASE:-snapshots}/amd64/{bsd{,.mp,.rd},{base,comp,game,man,xbase,xshare,xfont,xserv}${_REL}.tgz} )
 
 	pr_action "fetching ec2-init"
 	ftp -V -o ${_WRKDIR}/ec2-init \
