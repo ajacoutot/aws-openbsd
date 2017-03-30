@@ -23,6 +23,7 @@ umask 022
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:=${AWS_ACCESS_KEY}}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
+AWS_AZ=${AWS_AZ:=${AWS_REGION}a}
 
 MIRROR=${MIRROR:=https://mirrors.evowise.com/pub/OpenBSD}
 
@@ -201,7 +202,7 @@ create_ami() {
 		${_VMDK} \
 		-f vmdk \
 		--region ${AWS_REGION} \
-		-z ${AWS_REGION}a \
+		-z ${AWS_AZ} \
 		-d ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
 		-W "${AWS_SECRET_ACCESS_KEY}" \
