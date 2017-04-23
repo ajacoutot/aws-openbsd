@@ -130,8 +130,7 @@ create_img() {
 	installboot -r ${_MNT} ${_VNDEV}
 
 	pr_action "configuring the image"
-	# XXX hardcoded
-	echo "https://mirrors.evowise.com/pub/OpenBSD" >${_MNT}/etc/installurl
+	echo "${MIRROR}" >${_MNT}/etc/installurl
 	sed -e "s#\(/home ffs rw\)#\1,nodev,nosuid#" \
 		-e "s#\(/tmp ffs rw\)#\1,nodev,nosuid#" \
 		-e "s#\(/usr ffs rw\)#\1,nodev#" \
