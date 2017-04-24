@@ -58,7 +58,7 @@ pr_action() {
 create_img() {
 	_WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
 	_IMG=${_WRKDIR}/openbsd-${RELEASE:-current}-amd64-${TIMESTAMP}
-	local _MNT=${_WRKDIR}/mnt _REL=${RELEASE:-$(uname -r)} _p
+	local _MNT=${_WRKDIR}/mnt _REL=${RELEASE:-$(uname -r)} _p _m
 	local _VNDEV=$(vnconfig -l | grep 'not in use' | head -1 |
 		cut -d ':' -f1)
 	_REL=$(echo ${_REL} | tr -d '.')
@@ -82,16 +82,12 @@ create_img() {
 	fdisk -iy ${_VNDEV}
 	echo 'A\nd i\nd j\nd k\nR e\n512M\na i\n\n*\n\n/home\nq\ny\n' | \
 		disklabel -EF ${_WRKDIR}/fstab ${_VNDEV}
-	for _p in a d e f g h i; do newfs /dev/r${_VNDEV}${_p}; done
-	mount /dev/${_VNDEV}a ${_MNT}
-	install -d ${_MNT}/{tmp,var,usr,home}
-	mount /dev/${_VNDEV}d ${_MNT}/tmp
-	mount /dev/${_VNDEV}e ${_MNT}/var
-	mount /dev/${_VNDEV}f ${_MNT}/usr
-	install -d ${_MNT}/usr/{X11R6,local}
-	mount /dev/${_VNDEV}g ${_MNT}/usr/X11R6
-	mount /dev/${_VNDEV}h ${_MNT}/usr/local
-	mount /dev/${_VNDEV}i ${_MNT}/home
+	awk '$2~/^\//{sub(/^.+\./,"",$1);print $1, $2}' ${_WRKDIR}/fstab | \
+		while read _p _m; do
+			newfs /dev/r${_VNDEV}${_p}
+			install -d ${_MNT}${_m}
+			mount /dev/${_VNDEV}${_p} ${_MNT}${_m}
+		done
 
 	pr_action "fetching sets from ${MIRROR:##*//}"
 	( cd ${_WRKDIR} &&
@@ -159,13 +155,10 @@ create_img() {
 	echo "ec2-user" >${_MNT}/root/.forward
 
 	pr_action "unmounting the image"
-	umount ${_MNT}/usr/X11R6
-	umount ${_MNT}/usr/local
-	umount ${_MNT}/usr
-	umount ${_MNT}/var
-	umount ${_MNT}/home
-	umount ${_MNT}/tmp
-	umount ${_MNT}
+	awk '$2~/^\//{sub(/^.+\./,"",$1);print $1, $2}' ${_WRKDIR}/fstab | tail -r | \
+		while read _p _m; do
+			umount ${_MNT}${_m}
+		done
 	vnconfig -u ${_VNDEV}
 
 	pr_action "removing downloaded and temporary files"
