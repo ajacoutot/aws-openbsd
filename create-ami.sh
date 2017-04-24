@@ -80,9 +80,9 @@ create_img() {
 	pr_action "creating and mounting image filesystem"
 	vnconfig ${_VNDEV} ${_IMG}
 	fdisk -iy ${_VNDEV}
-	echo 'A\nd i\nd j\nd k\nR e\n512M\na i\n\n*\n\n/home\nq\ny\n' | \
+	echo 'A\nd i\nd j\nd k\nR e\n512M\na i\n\n*\n\n/home\nq\ny\n' |
 		disklabel -EF ${_WRKDIR}/fstab ${_VNDEV}
-	awk '$2~/^\//{sub(/^.+\./,"",$1);print $1, $2}' ${_WRKDIR}/fstab | \
+	awk '$2~/^\//{sub(/^.+\./,"",$1);print $1, $2}' ${_WRKDIR}/fstab |
 		while read _p _m; do
 			newfs /dev/r${_VNDEV}${_p}
 			install -d ${_MNT}${_m}
@@ -155,8 +155,8 @@ create_img() {
 	echo "ec2-user" >${_MNT}/root/.forward
 
 	pr_action "unmounting the image"
-	awk '$2~/^\//{sub(/^.+\./,"",$1);print $1, $2}' ${_WRKDIR}/fstab | tail -r | \
-		while read _p _m; do
+	awk '$2~/^\//{sub(/^.+\./,"",$1);print $1, $2}' ${_WRKDIR}/fstab |
+		tail -r | while read _p _m; do
 			umount ${_MNT}${_m}
 		done
 	vnconfig -u ${_VNDEV}
