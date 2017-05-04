@@ -47,17 +47,6 @@ http://blog.d2-si.fr/2016/02/15/openbsd-on-aws/
     AMI Name: openbsd-6.0-amd64  
     AMI Description: OpenBSD 6.0 x86_64. Unofficial build by https://github.com/wilkart  
 
- * EU Ireland
- 
-    AMI Id: ami-8fcdb6fc  
-    AMI Name: openbsd-6.0-amd64  
-    AMI Description: OpenBSD 6.0 x86_64. Unofficial build by https://github.com/wilkart  
-
- * SA São Paulo
- 
-    AMI Id: ami-c2990bae  
-    AMI Name: openbsd-6.0-amd64  
-    AMI Description: OpenBSD 6.0 x86_64. Unofficial build by https://github.com/wilkart  
 
 ### OpenBSD 5.9 
 
@@ -66,17 +55,3 @@ http://blog.d2-si.fr/2016/02/15/openbsd-on-aws/
     AMI Id: ami-ae19e4c1  
     AMI Name: openbsd-5.9-amd64  
     AMI Description: OpenBSD 5.9 x86_64. Unofficial build by https://github.com/wilkart  
-
- * EU Ireland
- 
-    AMI Id: ami-ccceb5bf  
-    AMI Name: openbsd-5.9-amd64  
-    AMI Description: OpenBSD 5.9 x86_64. Unofficial build by https://github.com/wilkart  
-
- * SA São Paulo
- 
-    AMI Id: ami-50b82a3c  
-    AMI Name: openbsd-5.9-amd64  
-    AMI Description: OpenBSD 5.9 x86_64. Unofficial build by https://github.com/wilkart  
-
-
