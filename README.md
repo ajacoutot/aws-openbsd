@@ -13,8 +13,8 @@ Running whatever is in this repo will propably end up destroying a kitten factor
 * curl, ec2-api-tools, awscli and vmdktool packages installed.
 * shell environment variables available.
 
-    export AWS_ACCESS_KEY_ID=YOUR_AWS_ACCES_KEY;
-    export AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_KEY;
+    export AWS_ACCESS_KEY_ID=YOUR_AWS_ACCES_KEY;  
+    export AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_KEY;  
 
 * Identity and Access Management on AWS configured.
 
