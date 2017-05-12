@@ -56,7 +56,7 @@ vagrant ssh;
 doas su -;
 ```
 
-Mount wd0k disk with 12GB as /tmp
+Mount wd0k disk with 12GB as /tmp.
 ```shell
 umount -f /tmp && mount -o "rw,nodev,nosuid" /dev/wd0k /tmp
 ```
