@@ -171,13 +171,14 @@ create_img() {
 
 volume_ids() {
 	aws --output json ec2 describe-conversion-tasks | \
-	python2.7 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"]) if "Id" in task["ImportVolume"]["Volume"] else None for task in json.load(sys.stdin)["ConversionTasks"]]'
+		python2.7 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"]) if "Id" in task["ImportVolume"]["Volume"] else None for task in json.load(sys.stdin)["ConversionTasks"]]'
 }
 
 create_ami() {
 	local _IMGNAME=${_IMG##*/}
 	local _BUCKETNAME=${_IMGNAME}
 	local _VMDK=${_IMG}.vmdk
+	local _VOLIDS_NEW _VOLIDS _v
 	typeset -l _BUCKETNAME
 	[[ -z ${TMPDIR} ]] || export _JAVA_OPTIONS=-Djava.io.tmpdir=${TMPDIR}
 	[[ -z ${http_proxy} ]] || {
@@ -196,8 +197,8 @@ create_ami() {
 	vmdktool -v ${_VMDK} ${_IMG}
 
 	pr_action "uploading image to S3 and converting to volume in region ${AWS_REGION}"
-	VOLIDS="$(volume_ids)"
-		ec2-import-volume \
+	_VOLIDS="$(volume_ids)"
+	ec2-import-volume \
 		${_VMDK} \
 		-f vmdk \
 		--region ${AWS_REGION} \
@@ -209,13 +210,16 @@ create_ami() {
 		-w "${AWS_SECRET_ACCESS_KEY}" \
 		-b ${_BUCKETNAME}
 
-	VOLIDS_NEW="$(volume_ids)"
+	_VOLIDS_NEW="$(volume_ids)"
 	echo
-	while [[ "$VOLIDS" = "$VOLIDS_NEW" ]]; do
+	while [[ ${_VOLIDS} == ${_VOLIDS_NEW} ]]; do
 		sleep 10
-		VOLIDS_NEW="$(volume_ids)"
+		_VOLIDS_NEW="$(volume_ids)"
 	done
-	_VOL=$(for v in $VOLIDS_NEW; do echo "$VOLIDS"|fgrep -q $v || echo $v;done)
+	_VOL=$(for _v in ${_VOLIDS_NEW}; do echo "${_VOLIDS}" | fgrep -q $v ||
+		echo $v; done)
+
+	# XXX
 	#echo
 	#echo "deleting local and remote disk images"
 	#rm -rf ${_WRKDIR}
