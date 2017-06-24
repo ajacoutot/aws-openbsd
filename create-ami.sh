@@ -216,8 +216,8 @@ create_ami() {
 		sleep 10
 		_VOLIDS_NEW="$(volume_ids)"
 	done
-	_VOL=$(for _v in ${_VOLIDS_NEW}; do echo "${_VOLIDS}" | fgrep -q $v ||
-		echo $v; done)
+	_VOL=$(for _v in ${_VOLIDS_NEW}; do echo "${_VOLIDS}" | fgrep -q $_v ||
+		echo $_v; done)
 
 	# XXX
 	#echo
