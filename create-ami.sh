@@ -25,7 +25,7 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
 AWS_AZ=${AWS_AZ:=${AWS_REGION}a}
 
-MIRROR=${MIRROR:=https://mirrors.evowise.com/pub/OpenBSD}
+MIRROR=${MIRROR:=https://ftp.fr.openbsd.org/pub/OpenBSD}
 
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 ################################################################################
@@ -127,7 +127,7 @@ create_img() {
 
 	pr_action "configuring the image"
 	# XXX hardcoded
-	echo "https://mirrors.evowise.com/pub/OpenBSD" >${_MNT}/etc/installurl
+	echo "https://ftp.fr.openbsd.org/pub/OpenBSD" >${_MNT}/etc/installurl
 	sed -e "s#\(/home ffs rw\)#\1,nodev,nosuid#" \
 		-e "s#\(/tmp ffs rw\)#\1,nodev,nosuid#" \
 		-e "s#\(/usr ffs rw\)#\1,nodev#" \
