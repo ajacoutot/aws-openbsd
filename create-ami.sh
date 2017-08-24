@@ -166,11 +166,12 @@ create_img() {
 	rm ${_WRKDIR}/fstab || true # non-fatal
 	rm -r ${_MNT} || true # non-fatal
 
-	pr_action "image available at: ${_IMG}"
+	pr_action "image available at:"
+	echo "${_IMG}"
 }
 
 volume_ids() {
-	aws --output json ec2 describe-conversion-tasks | \
+	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks | \
 		python2.7 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"]) if "Id" in task["ImportVolume"]["Volume"] else None for task in json.load(sys.stdin)["ConversionTasks"]]'
 }
 
