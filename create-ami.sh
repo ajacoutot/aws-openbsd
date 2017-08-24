@@ -202,7 +202,7 @@ create_ami() {
 	pr_action "converting image to stream-based VMDK"
 	vmdktool -v ${_VMDK} ${_IMG}
 
-	pr_action "uploading image to S3 and converting to volume in region ${AWS_REGION}"
+	pr_action "uploading image to S3 and converting to volume in az ${AWS_AZ}"
 	_VOLIDS="$(volume_ids)"
 	ec2-import-volume \
 		${_VMDK} \
