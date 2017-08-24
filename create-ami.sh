@@ -154,6 +154,11 @@ create_img() {
 	echo "permit nopass ec2-user" >${_MNT}/etc/doas.conf
 	echo "ec2-user" >${_MNT}/root/.forward
 
+	pr_action "relinking to create unique kernel"
+	sha256 ${_MNT}/bsd | (umask 077; sed "s,${_MNT},," \
+		>${_MNT}/var/db/kernel.SHA256)
+	chroot ${_MNT} /usr/libexec/reorder_kernel
+
 	pr_action "unmounting the image"
 	awk '$2~/^\//{sub(/^.+\./,"",$1);print $1, $2}' ${_WRKDIR}/fstab |
 		tail -r | while read _p _m; do
