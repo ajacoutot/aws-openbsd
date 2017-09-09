@@ -157,7 +157,9 @@ create_img() {
 	pr_action "relinking to create unique kernel"
 	sha256 ${_MNT}/bsd | (umask 077; sed "s,${_MNT},," \
 		>${_MNT}/var/db/kernel.SHA256)
-	chroot ${_MNT} /usr/libexec/reorder_kernel
+	if [[ -x ${_MNT}/usr/libexec/reorder_kernel ]]; then
+		chroot ${_MNT} /usr/libexec/reorder_kernel
+	fi
 
 	pr_action "unmounting the image"
 	awk '$2~/^\//{sub(/^.+\./,"",$1);print $1, $2}' ${_WRKDIR}/fstab |
