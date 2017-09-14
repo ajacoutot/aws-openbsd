@@ -104,7 +104,7 @@ sysclean()
 	>/etc/random.seed
 	>/var/db/host.random
 	# empty log files
-	rm -f /var/log/[a-zA-Z]*.{{out,log}{,.old},[0-9]}.*
+	rm -f /var/log/[a-zA-Z]*.{{out,log}{,.old},[0-9]}*
 	for _l in $(find /var/log -type f ! -name '*.gz' -size +0); do
 		>${_l}
 	done
