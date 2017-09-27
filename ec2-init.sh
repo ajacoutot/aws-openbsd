@@ -117,11 +117,11 @@ fi
 mock_pf open
 if [[ $(mock meta-data/instance-id) != $(cat /var/db/instance-id 2>/dev/null) ]]
 then
+	sysclean # run early to prevent erasing logs from ec2-init
 	ec2_instanceid
 	ec2_pubkey
 	ec2_hostname
 	ec2_userdata
+	mock_pf close
 	ec2_fingerprints
-	sysclean
 fi
-mock_pf close
