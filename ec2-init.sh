@@ -46,7 +46,7 @@ ec2_hostname()
 ec2_instanceid()
 {
 	local _instanceid="$(mock meta-data/instance-id)"
-	print -- "${_instanceid}" >/var/db/ec2-init
+	print -- "${_instanceid}" >/var/db/instance-id
 }
 
 ec2_pubkey()
@@ -115,7 +115,8 @@ if [[ $(id -u) != 0 ]]; then
 fi
 
 mock_pf open
-if [[ $(mock meta-data/instance-id) != $(cat /var/db/ec2-init 2>/dev/null) ]]; then
+if [[ $(mock meta-data/instance-id) != $(cat /var/db/instance-id 2>/dev/null) ]]
+then
 	ec2_instanceid
 	ec2_pubkey
 	ec2_hostname
