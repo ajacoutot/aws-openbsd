@@ -135,7 +135,7 @@ pr_err()
 
 setup_forwarding()
 {
-	! ${CONFIG_NET} && return 0
+	! ${NETCONF} && return 0
 
 	if [[ $(sysctl -n net.inet.ip.forwarding) != 1 ]]; then
 		RESET_FWD=true
@@ -145,7 +145,7 @@ setup_forwarding()
 
 setup_pf()
 {
-	! ${CONFIG_NET} && return 0
+	! ${NETCONF} && return 0
 
 	local _pfrules
 
@@ -176,13 +176,18 @@ trap_handler()
 	if ${RESET_PF}; then
 		pfctl -d >/dev/null
 		pfctl -F rules >/dev/null
-	elif ${CONFIG_NET}; then
+	elif ${NETCONF}; then
 		pfctl -f /etc/pf.conf
 	fi
 
 	if ${RESET_FWD}; then
 		sysctl -q net.inet.ip.forwarding=0
 	fi
+}
+
+usage()
+{
+	# XXX
 }
 
 (($(id -u) != 0)) && sp_err "${0##*/}: need root privileges"
@@ -195,13 +200,21 @@ RESET_FWD=false
 RESET_PF=false
 RESET_VMD=false
 
-# XXX getopt
-RELEASE=${RELEASE:-snapshots}
-MIRROR="cdn.openbsd.org"
-CONFIG_NET=true
-
 trap 'trap_handler' EXIT
 trap exit HUP INT TERM
+
+while getops c:m:r: arg; do
+	case ${arg} in
+	c)	NETCONF=true ;;
+	m)	MIRROR="${OPTARG}" ;;
+	r)	RELEASE="${OPTARG}" ;;
+	*)	usage ;;
+	esac
+done
+
+MIRROR=${MIRROR:-cdn.openbsd.org}
+NETCONF=${NETCONF:-false}
+RELEASE=${RELEASE:-snapshots}
 
 setup_vmd
 setup_pf
