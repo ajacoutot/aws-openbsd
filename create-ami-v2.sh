@@ -92,6 +92,8 @@ create_install_site()
 
 	echo "sndiod_flags=NO" >/etc/rc.conf.local
 	echo "permit keepenv nopass ec2-user" >/etc/doas.conf
+
+	rm /install.site
 	EOF
 
 	chmod 0555 ${_WRKDIR}/install.site
