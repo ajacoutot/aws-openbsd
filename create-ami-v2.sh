@@ -189,7 +189,10 @@ trap_handler()
 		sysctl -q net.inet.ip.forwarding=0
 	fi
 
-	echo "Work directory: ${_WRKDIR}"
+	if [[ -n ${_WRKDIR} ]]; then
+		rmdir ${_WRKDIR} 2>/dev/null ||
+			echo "Work directory: ${_WRKDIR}"
+	fi
 }
 
 usage()
@@ -199,9 +202,6 @@ usage()
        -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
        -r \"release\" -- e.g 6.0; default to snapshots"
 }
-
-trap 'trap_handler' EXIT
-trap exit HUP INT TERM
 
 while getopts cm:r: arg; do
 	case ${arg} in
@@ -218,6 +218,9 @@ done
 [[ -z $(dmesg | grep ^vmm0 | tail -1) ]] &&
 	pr_err "${0##*/}: need vmm(4) support"
 which upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
+
+trap 'trap_handler' EXIT
+trap exit HUP INT TERM
 
 _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
 MIRROR=${MIRROR:-cdn.openbsd.org}
