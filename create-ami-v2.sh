@@ -217,7 +217,7 @@ done
 [[ $(uname -m) != amd64 ]] && pr_err "${0##*/}: only supports amd64"
 [[ -z $(dmesg | grep ^vmm0 | tail -1) ]] &&
 	pr_err "${0##*/}: need vmm(4) support"
-which upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
+type upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
 
 trap 'trap_handler' EXIT
 trap exit HUP INT TERM
