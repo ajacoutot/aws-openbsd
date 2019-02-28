@@ -78,7 +78,7 @@ create_img()
 create_install_site()
 {
 	# XXX
-	# bsd.mp
+	# bsd.mp + relink directory
 	# https://cdn.openbsd.org/pub/OpenBSD in installurl if MIRROR ~= file:/
 
 	cat <<-'EOF' >>${_WRKDIR}/install.site
