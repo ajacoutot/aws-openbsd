@@ -190,7 +190,7 @@ usage()
 	pr_err "usage: ${0##*/}
        -c -- autoconfigure pf(4) and enable IP forwarding
        -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
-       -r \"release\" -- e.g 6.0; default to current"
+       -r \"release\" -- e.g 6.0; default to snapshots"
 }
 
 trap 'trap_handler' EXIT
