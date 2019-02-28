@@ -65,7 +65,7 @@ create_img()
 	upobsd -V ${RELEASE} -a amd64 -i ${_WRKDIR}/auto_install.conf \
 		-o ${_bsdrd}
 
-	vmctl create ${_amimg} -s ${SIZE:-10}G
+	vmctl create ${_amimg} -s ${IMGSIZE}G
 
 	(sleep 30 && vmctl wait ${_aminam} && vmctl stop ${_aminam} -f) &
 
@@ -207,7 +207,7 @@ while getopts cm:r:s: arg; do
 	c)	NETCONF=true ;;
 	m)	MIRROR="${OPTARG}" ;;
 	r)	RELEASE="${OPTARG}" ;;
-	s)	SIZE="${OPTARG}" ;;
+	s)	IMGSIZE="${OPTARG}" ;;
 	*)	usage ;;
 	esac
 done
@@ -223,6 +223,7 @@ trap 'trap_handler' EXIT
 trap exit HUP INT TERM
 
 _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
+IMGSIZE=${IMGSIZE:-10}
 MIRROR=${MIRROR:-cdn.openbsd.org}
 NETCONF=${NETCONF:-false}
 RELEASE=${RELEASE:-snapshots}
