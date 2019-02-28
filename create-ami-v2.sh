@@ -202,7 +202,7 @@ usage()
        -s \"image size in GB\" -- default to 10"
 }
 
-while getopts cm:r: arg; do
+while getopts cm:r:s: arg; do
 	case ${arg} in
 	c)	NETCONF=true ;;
 	m)	MIRROR="${OPTARG}" ;;
