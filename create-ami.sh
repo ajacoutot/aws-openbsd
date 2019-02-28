@@ -25,7 +25,7 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:=eu-west-1}
 AWS_AZ=${AWS_AZ:=${AWS_REGION}a}
 
-MIRROR=${MIRROR:=https://fastly.cdn.openbsd.org/pub/OpenBSD}
+MIRROR=${MIRROR:=https://cdn.openbsd.org/pub/OpenBSD}
 
 TIMESTAMP=$(date -u +%G%m%dT%H%M%SZ)
 ################################################################################
