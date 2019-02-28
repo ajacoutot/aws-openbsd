@@ -191,6 +191,7 @@ usage()
 }
 
 (($(id -u) != 0)) && sp_err "${0##*/}: need root privileges"
+[[ $(uname -m) != amd64 ]] && sp_err "${0##*/}: only supports amd64"
 which upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
 
 _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
