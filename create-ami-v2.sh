@@ -65,7 +65,7 @@ create_img()
 	upobsd -V ${RELEASE} -a amd64 -i ${_WRKDIR}/auto_install.conf \
 		-o ${_bsdrd}
 
-	vmctl create ${_amimg} -s 10g
+	vmctl create ${_amimg} -s ${SIZE:-10}G
 
 	(sleep 30 && vmctl wait ${_aminam} && vmctl stop ${_aminam} -f) &
 
@@ -200,7 +200,8 @@ usage()
 	pr_err "usage: ${0##*/}
        -c -- autoconfigure pf(4) and enable IP forwarding
        -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
-       -r \"release\" -- e.g 6.0; default to snapshots"
+       -r \"release\" -- e.g 6.0; default to snapshots
+       -s \"image size in GB\" -- default to 10"
 }
 
 while getopts cm:r: arg; do
@@ -208,6 +209,7 @@ while getopts cm:r: arg; do
 	c)	NETCONF=true ;;
 	m)	MIRROR="${OPTARG}" ;;
 	r)	RELEASE="${OPTARG}" ;;
+	s)	SIZE="${OPTARG}" ;;
 	*)	usage ;;
 	esac
 done
