@@ -71,6 +71,8 @@ create_img()
 
 	vmctl start ${_aminam} -b ${_bsdrd} -c -L \
 		-d ${_amimg} -d ${_WRKDIR}/siteXX.img
+	# XXX handle installation error
+	# (e.g. ftp: raw.githubusercontent.com: no address associated with name)
 }
 
 create_install_site()
@@ -101,6 +103,7 @@ create_install_site()
 
 create_install_site_disk()
 {
+	# XXX trap vnd and mount
 	local _siteimg=${_WRKDIR}/siteXX.img _sitemnt=${_WRKDIR}/siteXX
 	local _vndev="$(vnconfig -l | grep 'not in use' | head -1 |
 		cut -d ':' -f1)"
