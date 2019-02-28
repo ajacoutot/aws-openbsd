@@ -182,6 +182,19 @@ volume_ids() {
 		python2.7 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"]) if "Id" in task["ImportVolume"]["Volume"] else None for task in json.load(sys.stdin)["ConversionTasks"]]'
 }
 
+volume_state() {
+	local _VOL=$1
+
+	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks | \
+		python2.7 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"],task["State"]) if "Id" in task["ImportVolume"]["Volume"] else None for task in json.load(sys.stdin)["ConversionTasks"]]' | grep "${_VOL}" | awk '{print $NF}'
+}
+
+volume_progress() {
+	local _VOL=$1
+	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks | \
+		python2.7 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"],task["StatusMessage"]) if ("Id" in task["ImportVolume"]["Volume"] and "StatusMessage" in task) else None for task in json.load(sys.stdin)["ConversionTasks"]]' | grep "${_VOL}" | awk '{print $2,$3}'
+}
+
 create_ami() {
 	local _IMGNAME=${_IMG##*/}
 	local _BUCKETNAME=${_IMGNAME}
@@ -227,6 +240,15 @@ create_ami() {
 	_VOL=$(for _v in ${_VOLIDS_NEW}; do echo "${_VOLIDS}" | fgrep -q $_v ||
 		echo $_v; done)
 
+	pr_action "waiting for completed conversion of volume for ${_VOL}"
+	while /usr/bin/true; do
+		_STATE="$(volume_state ${_VOL})"
+		[ "${_STATE}" = "completed" ] && break
+		[ "${_STATE}" = "active" ] && _PROGRESS="$(volume_progress ${_VOL})"
+		[ -n "${_PROGRESS}" ] && echo "${_PROGRESS}"
+		sleep 10
+	done
+
 	# XXX
 	#echo
 	#echo "deleting local and remote disk images"
@@ -245,6 +267,7 @@ create_ami() {
 			-O "${AWS_ACCESS_KEY_ID}" \
 			-W "${AWS_SECRET_ACCESS_KEY}" \
 			--region ${AWS_REGION} 2>/dev/null |
+			grep "${_VOL}" |
 			grep "completed.*${_IMGNAME}" |
 			grep -Eo "snap-[[:alnum:]]*") || true
 		sleep 10
