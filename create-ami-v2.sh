@@ -188,6 +188,8 @@ trap_handler()
 	if ${RESET_FWD:-false}; then
 		sysctl -q net.inet.ip.forwarding=0
 	fi
+
+	echo "Work directory: ${_WRKDIR}"
 }
 
 usage()
