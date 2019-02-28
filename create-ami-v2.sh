@@ -199,7 +199,7 @@ _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
 trap 'trap_handler' EXIT
 trap exit HUP INT TERM
 
-while getops c:m:r: arg; do
+while getops cm:r: arg; do
 	case ${arg} in
 	c)	NETCONF=true ;;
 	m)	MIRROR="${OPTARG}" ;;
