@@ -187,7 +187,10 @@ trap_handler()
 
 usage()
 {
-	# XXX
+	pr_err "usage: ${0##*/}
+       -c -- autoconfigure pf(4) and enable IP forwarding
+       -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
+       -r \"release\" -- e.g 6.0; default to current"
 }
 
 (($(id -u) != 0)) && pr_err "${0##*/}: need root privileges"
@@ -199,7 +202,7 @@ _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
 trap 'trap_handler' EXIT
 trap exit HUP INT TERM
 
-while getops cm:r: arg; do
+while getopts cm:r: arg; do
 	case ${arg} in
 	c)	NETCONF=true ;;
 	m)	MIRROR="${OPTARG}" ;;
