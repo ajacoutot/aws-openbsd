@@ -169,18 +169,18 @@ trap_handler()
 {
 	set +e # we're trapped
 
-	if ${RESET_VMD}; then
+	if ${RESET_VMD:-false}; then
 		rcctl stop vmd >/dev/null
 	fi
 
-	if ${RESET_PF}; then
+	if ${RESET_PF:-false}; then
 		pfctl -d >/dev/null
 		pfctl -F rules >/dev/null
 	elif ${NETCONF}; then
 		pfctl -f /etc/pf.conf
 	fi
 
-	if ${RESET_FWD}; then
+	if ${RESET_FWD:-false}; then
 		sysctl -q net.inet.ip.forwarding=0
 	fi
 }
@@ -195,10 +195,6 @@ usage()
 which upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
 
 _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
-
-RESET_FWD=false
-RESET_PF=false
-RESET_VMD=false
 
 trap 'trap_handler' EXIT
 trap exit HUP INT TERM
