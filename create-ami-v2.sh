@@ -87,10 +87,8 @@ create_install_site()
 	chown root:bin /usr/local/libexec/ec2-init
 	chmod 0555 /usr/local/libexec/ec2-init
 
-	echo dhcp >/etc/hostname.xnf0
-
 	echo "!/usr/local/libexec/ec2-init" >>/etc/hostname.vio0
-	echo "!/usr/local/libexec/ec2-init" >>/etc/hostname.xnf0
+	cp -p /etc/hostname.vio0 /etc/hostname.xnf0
 
 	echo "sndiod_flags=NO" >/etc/rc.conf.local
 	echo "permit keepenv nopass ec2-user" >/etc/doas.conf
