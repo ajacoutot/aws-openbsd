@@ -59,7 +59,7 @@ create_img()
 	local _amimg=${_WRKDIR}/ami.img _aminam=ami-${_WRKDIR##*/aws-ami.}
 	local _bsdrd=${_WRKDIR}/bsd.rd
 
-	create_site_disk
+	create_install_site_disk
 
 	build_autoinstallconf
 	upobsd -V ${RELEASE} -a amd64 -i ${_WRKDIR}/auto_install.conf \
@@ -97,7 +97,7 @@ create_install_site()
 	chmod 0555 ${_WRKDIR}/install.site
 }
 
-create_site_disk()
+create_install_site_disk()
 {
 	local _siteimg=${_WRKDIR}/siteXX.img _sitemnt=${_WRKDIR}/siteXX
 	local _vndev="$(vnconfig -l | grep 'not in use' | head -1 |
