@@ -191,10 +191,9 @@ usage()
 }
 
 (($(id -u) != 0)) && sp_err "${0##*/}: need root privileges"
+which upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
 
 _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
-
-which upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
 
 RESET_FWD=false
 RESET_PF=false
