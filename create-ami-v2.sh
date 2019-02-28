@@ -193,8 +193,6 @@ usage()
        -r \"release\" -- e.g 6.0; default to current"
 }
 
-_WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
-
 trap 'trap_handler' EXIT
 trap exit HUP INT TERM
 
@@ -214,6 +212,7 @@ done
 	pr_err "${0##*/}: need vmm(4) support"
 which upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
 
+_WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
 MIRROR=${MIRROR:-cdn.openbsd.org}
 NETCONF=${NETCONF:-false}
 RELEASE=${RELEASE:-snapshots}
