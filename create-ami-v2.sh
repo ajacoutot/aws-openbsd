@@ -198,8 +198,8 @@ usage()
 	pr_err "usage: ${0##*/}
        -c -- autoconfigure pf(4) and enable IP forwarding
        -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
-       -r \"release\" -- e.g 6.0; default to snapshots
-       -s \"image size in GB\" -- default to 10"
+       -r \"release\" -- e.g 6.5; default to \"snapshots\"
+       -s \"image size in GB\" -- default to \"10\""
 }
 
 while getopts cm:r:s: arg; do
