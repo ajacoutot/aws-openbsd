@@ -387,7 +387,7 @@ readonly CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF RELEASE
 if [[ ! -f ${IMGPATH} ]]; then
 	(($(id -u) != 0)) && pr_err "${0##*/}: need root privileges"
 	[[ $(uname -m) != amd64 ]] && pr_err "${0##*/}: only supports amd64"
-	[[ -z $(dmesg | grep ^vmm0 | tail -1) ]] &&
+	[[ -z $(cat /var/run/dmesg.boot | grep ^vmm0 | tail -1) ]] &&
 		pr_err "${0##*/}: need vmm(4) support"
 	type upobsd >/dev/null 2>&1 ||
 		pr_err "${0##*/}: package \"upobsd\" is not installed"
