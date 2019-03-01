@@ -401,6 +401,8 @@ if ${CREATE_AMI}; then
 	[[ -n ${AWS_ACCESS_KEY_ID} && -n ${AWS_SECRET_ACCESS_KEY} ]] ||
 		pr_err "${0##*/}: AWS credentials aren't set
 (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)"
+	type aws >/dev/null 2>&1 ||
+		pr_err "${0##*/}: package \"awscli\" is not installed"
 	# XXX seems the aws cli does more checking on the image than the ec2
 	# tools, preventing creating an OpenBSD AMI; so we need java for now :-(
 	[[ -n ${JAVA_HOME} ]] ||
