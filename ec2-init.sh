@@ -23,6 +23,28 @@
 
 set -e
 
+cleanjunk()
+{
+	local _l
+	# reset root's password
+	#chpass -a 'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh'
+	# remove generated keys
+	rm -f /etc/{iked,isakmpd}/{local.pub,private/local.key} \
+		/etc/ssh/ssh_host_*
+	# remove dhcp client configuration and old leases
+	rm -f /etc/dhclient.conf /var/db/dhclient.leases.*
+	# remove cruft from /tmp
+	rm -rf /tmp/{.[!.],}*
+	# reset entropy files
+	>/etc/random.seed
+	>/var/db/host.random
+	# empty log files
+	rm -f /var/log/[a-zA-Z]*.{{out,log}{,.old},[0-9]}*
+	for _l in $(find /var/log -type f ! -name '*.gz' -size +0); do
+		>${_l}
+	done
+}
+
 ec2_fingerprints()
 {
 	cat <<-'EOF-RC' >>/etc/rc.firsttime
@@ -87,28 +109,6 @@ mock_pf()
 	esac
 }
 
-sysclean()
-{
-	local _l
-	# reset root's password
-	#chpass -a 'root:*:0:0:daemon:0:0:Charlie &:/root:/bin/ksh'
-	# remove generated keys
-	rm -f /etc/{iked,isakmpd}/{local.pub,private/local.key} \
-		/etc/ssh/ssh_host_*
-	# remove dhcp client configuration and old leases
-	rm -f /etc/dhclient.conf /var/db/dhclient.leases.*
-	# remove cruft from /tmp
-	rm -rf /tmp/{.[!.],}*
-	# reset entropy files
-	>/etc/random.seed
-	>/var/db/host.random
-	# empty log files
-	rm -f /var/log/[a-zA-Z]*.{{out,log}{,.old},[0-9]}*
-	for _l in $(find /var/log -type f ! -name '*.gz' -size +0); do
-		>${_l}
-	done
-}
-
 if [[ $(id -u) != 0 ]]; then
 	echo "${0##*/}: needs root privileges"
 	exit 1
@@ -117,7 +117,7 @@ fi
 mock_pf open
 if [[ $(mock meta-data/instance-id) != $(cat /var/db/instance-id 2>/dev/null) ]]
 then
-	sysclean # run early to prevent erasing logs from ec2-init
+	cleanjunk # run early to prevent erasing logs from ec2-init
 	ec2_pubkey
 	ec2_instanceid # write instance-id _after_ ssh keys are installed
 	ec2_hostname
