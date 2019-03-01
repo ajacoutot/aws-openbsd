@@ -237,11 +237,11 @@ create_install_site_disk()
 		cut -d ':' -f1)"
 	local _rel=$(uname -r)
 
+	create_install_site
+
 	pr_title "creating sd1 and storing siteXX.tgz"
 
 	[[ -z ${_vndev} ]] && pr_err "${0##*/}: no vnd(4) device available"
-
-	create_install_site
 
 	vmctl create ${_siteimg} -s 1G
 	vnconfig ${_vndev} ${_siteimg}
