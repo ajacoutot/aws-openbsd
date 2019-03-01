@@ -48,13 +48,14 @@ cleanjunk()
 ec2_fingerprints()
 {
 	cat <<-'EOF-RC' >>/etc/rc.firsttime
-	logger -s -t ec2 <<EOF
+	logger -s -t ec2 2>/var/log/cloudinit-output.log <<EOF
 	#############################################################
 	-----BEGIN SSH HOST KEY FINGERPRINTS-----
 	$(for _f in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf ${_f}; done)
 	-----END SSH HOST KEY FINGERPRINTS-----
 	#############################################################
 	EOF
+	cat /var/log/cloudinit-output.log
 	EOF-RC
 }
 
