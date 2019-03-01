@@ -57,12 +57,6 @@ aws_create_ami() {
 		sleep 10
 	done
 
-	# XXX
-	#echo
-	#echo "deleting local and remote disk images"
-	#rm -rf ${_WRKDIR}
-	#ec2-delete-disk-image
-
 	pr_title "creating snapshot in region ${AWS_REGION}"
 	ec2-create-snapshot \
 	       -O "${AWS_ACCESS_KEY_ID}" \
@@ -80,6 +74,8 @@ aws_create_ami() {
 			grep -Eo "snap-[[:alnum:]]*") || true
 		sleep 10
 	done
+
+	# XXX remove volume and s3 bucket; ec2-delete-disk-image ...
 
 	pr_title "registering new AMI in region ${AWS_REGION}: ${_IMGNAME}"
 	ec2-register \
