@@ -56,21 +56,18 @@ build_autoinstallconf()
 
 create_img()
 {
-	local _amimg=${_WRKDIR}/ami.img _aminam=ami-${_WRKDIR##*/aws-ami.}
-	local _bsdrd=${_WRKDIR}/bsd.rd
-
 	create_install_site_disk
 
 	build_autoinstallconf
 	upobsd -V ${RELEASE} -a amd64 -i ${_WRKDIR}/auto_install.conf \
-		-o ${_bsdrd}
+		-o ${_WRKDIR}/bsd.rd
 
-	vmctl create ${_amimg} -s ${IMGSIZE}G
+	vmctl create ${_WRKDIR}/${_IMGNAME} -s ${IMGSIZE}G
 
-	(sleep 30 && vmctl wait ${_aminam} && vmctl stop ${_aminam} -f) &
+	(sleep 30 && vmctl wait ${_IMGNAME} && vmctl stop ${_IMGNAME} -f) &
 
-	vmctl start ${_aminam} -b ${_bsdrd} -c -L \
-		-d ${_amimg} -d ${_WRKDIR}/siteXX.img
+	vmctl start ${_IMGNAME} -b ${_WRKDIR}/bsd.rd -c -L \
+		-d ${_WRKDIR}/${_IMGNAME} -d ${_WRKDIR}/siteXX.img
 	# XXX handle installation error
 	# (e.g. ftp: raw.githubusercontent.com: no address associated with name)
 }
@@ -197,14 +194,16 @@ usage()
 {
 	pr_err "usage: ${0##*/}
        -c -- autoconfigure pf(4) and enable IP forwarding
+       -d -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
        -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
        -r \"release\" -- e.g 6.5; default to \"snapshots\"
        -s \"image size in GB\" -- default to \"10\""
 }
 
-while getopts cm:r:s: arg; do
+while getopts cd:m:r:s: arg; do
 	case ${arg} in
 	c)	NETCONF=true ;;
+	d)	DESCR="${OPTARG}" ;;
 	m)	MIRROR="${OPTARG}" ;;
 	r)	RELEASE="${OPTARG}" ;;
 	s)	IMGSIZE="${OPTARG}" ;;
@@ -222,13 +221,21 @@ type upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
 trap 'trap_handler' EXIT
 trap exit HUP INT TERM
 
+_TS=$(date -u +%G%m%dT%H%M%SZ)
 _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
+
 IMGSIZE=${IMGSIZE:-10}
 MIRROR=${MIRROR:-cdn.openbsd.org}
 NETCONF=${NETCONF:-false}
 RELEASE=${RELEASE:-snapshots}
 
-readonly _WRKDIR IMGSIZE MIRROR NETCONF RELEASE
+_IMGNAME=openbsd-${RELEASE}-${_TS}
+! [[ ${RELEASE} == snapshots ]] ||
+	_IMGNAME=${_IMGNAME%snapshots*}current${_IMGNAME#*snapshots}
+
+DESCR=${DESCR:-${_IMGNAME}}
+
+readonly _IMGNAME _TS _WRKDIR DESCR IMGSIZE MIRROR NETCONF RELEASE
 
 setup_vmd
 setup_pf
