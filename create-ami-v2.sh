@@ -196,20 +196,34 @@ usage()
        -c -- autoconfigure pf(4) and enable IP forwarding
        -d -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
        -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
+       -m -- only create a RAW image (don't convert to an AMI and push to AWS)
        -r \"release\" -- e.g 6.5; default to \"snapshots\"
        -s \"image size in GB\" -- default to \"10\""
 }
 
-while getopts cd:m:r:s: arg; do
+while getopts cd:m:nr:s: arg; do
 	case ${arg} in
 	c)	NETCONF=true ;;
 	d)	DESCR="${OPTARG}" ;;
 	m)	MIRROR="${OPTARG}" ;;
+	n)	CREATE_AMI=false ;;
 	r)	RELEASE="${OPTARG}" ;;
 	s)	IMGSIZE="${OPTARG}" ;;
 	*)	usage ;;
 	esac
 done
+
+_TS=$(date -u +%G%m%dT%H%M%SZ)
+CREATE_AMI=${CREATE_AMI:-true}
+IMGSIZE=${IMGSIZE:-10}
+MIRROR=${MIRROR:-cdn.openbsd.org}
+NETCONF=${NETCONF:-false}
+RELEASE=${RELEASE:-snapshots}
+_IMGNAME=openbsd-${RELEASE}-amd64-${_TS}
+! [[ ${RELEASE} == snapshots ]] ||
+	_IMGNAME=${_IMGNAME%snapshots*}current${_IMGNAME#*snapshots}
+DESCR=${DESCR:-${_IMGNAME}}
+readonly _IMGNAME _TS CREATE_AMI DESCR IMGSIZE MIRROR NETCONF RELEASE
 
 # check for requirements
 (($(id -u) != 0)) && pr_err "${0##*/}: need root privileges"
@@ -217,25 +231,24 @@ done
 [[ -z $(dmesg | grep ^vmm0 | tail -1) ]] &&
 	pr_err "${0##*/}: need vmm(4) support"
 type upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
+if ${CREATE_AMI}; then
+	# XXX seems the aws cli does more checking on the image than the ec2
+	# tools, preventing creating an OpenBSD AMI; so we need java for now :-(
+	[[ -n ${JAVA_HOME} ]] ||
+		export JAVA_HOME=$(javaPathHelper -h ec2-api-tools) 2>/dev/null
+	[[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
+	type ec2-import-volume >/dev/null 2>&1 ||
+		export PATH=${EC2_HOME}/bin:${PATH}
+	type ec2-import-volume >/dev/null 2>&1 ||
+		pr_err "package \"ec2-api-tools\" is not installed"
+	type vmdktool >/dev/null 2>&1 ||
+		pr_err "package \"vmdktool\" is not installed"
+fi
 
 trap 'trap_handler' EXIT
 trap exit HUP INT TERM
 
-_TS=$(date -u +%G%m%dT%H%M%SZ)
-_WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
-
-IMGSIZE=${IMGSIZE:-10}
-MIRROR=${MIRROR:-cdn.openbsd.org}
-NETCONF=${NETCONF:-false}
-RELEASE=${RELEASE:-snapshots}
-
-_IMGNAME=openbsd-${RELEASE}-amd64-${_TS}
-! [[ ${RELEASE} == snapshots ]] ||
-	_IMGNAME=${_IMGNAME%snapshots*}current${_IMGNAME#*snapshots}
-
-DESCR=${DESCR:-${_IMGNAME}}
-
-readonly _IMGNAME _TS _WRKDIR DESCR IMGSIZE MIRROR NETCONF RELEASE
+readonly _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
 
 setup_vmd
 setup_pf
