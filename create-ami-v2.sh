@@ -25,7 +25,7 @@ aws_create_ami() {
 	vmdktool -v ${_vmdkpath} ${IMGPATH}
 
 	pr_title "uploading image to S3 and converting to volume in az ${AWS_AZ}"
-	_volids="$(volume_ids)"
+	_volids="$(aws_volume_ids)"
 	ec2-import-volume \
 		${_vmdkpath} \
 		-f vmdk \
@@ -38,20 +38,21 @@ aws_create_ami() {
 		-w "${AWS_SECRET_ACCESS_KEY}" \
 		-b ${_IMGNAME}
 
-	_volids_new="$(volume_ids)"
+	_volids_new="$(aws_volume_ids)"
 	echo
 	while [[ ${_volids} == ${_volids_new} ]]; do
 		sleep 10
-		_volids_new="$(volume_ids)"
+		_volids_new="$(aws_volume_ids)"
 	done
 	_vol=$(for _v in ${_volids_new}; do echo "${_volids}" | fgrep -q $_v ||
 		echo $_v; done)
 
 	pr_title "waiting for completed conversion of volume for ${_vol}"
 	while /usr/bin/true; do
-		_state="$(volume_state ${_vol})"
+		_state="$(aws_volume_state ${_vol})"
 		[[ ${_state} == completed ]] && break
-		[[ ${_state} == active ]] && _progress="$(volume_progress ${_vol})"
+		[[ ${_state} == active ]] &&
+			_progress="$(aws_volume_progress ${_vol})"
 		[[ -n ${_progress} ]] && echo "${_progress}"
 		sleep 10
 	done
