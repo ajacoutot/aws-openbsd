@@ -198,6 +198,8 @@ create_img()
 		${_WRKDIR}/siteXX.img
 	# XXX handle installation error
 	# (e.g. ftp: raw.githubusercontent.com: no address associated with name)
+
+	# XXX handle EOT
 }
 
 create_install_site()
