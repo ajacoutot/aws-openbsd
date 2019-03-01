@@ -17,6 +17,104 @@
 set -e
 umask 022
 
+aws_create_ami() {
+	local _progress _snap _state _v _vol _volids _volids_new
+	local _vmdkpath=${IMGPATH}.vmdk
+
+	pr_action "converting image to stream-based VMDK"
+	vmdktool -v ${_vmdkpath} ${IMGPATH}
+
+	pr_action "uploading image to S3 and converting to volume in az ${AWS_AZ}"
+	_volids="$(volume_ids)"
+	ec2-import-volume \
+		${_vmdkpath} \
+		-f vmdk \
+		--region ${AWS_REGION} \
+		-z ${AWS_AZ} \
+		-d ${_IMGNAME} \
+		-O "${AWS_ACCESS_KEY_ID}" \
+		-W "${AWS_SECRET_ACCESS_KEY}" \
+		-o "${AWS_ACCESS_KEY_ID}" \
+		-w "${AWS_SECRET_ACCESS_KEY}" \
+		-b ${_IMGNAME}
+
+	_volids_new="$(volume_ids)"
+	echo
+	while [[ ${_volids} == ${_volids_new} ]]; do
+		sleep 10
+		_volids_new="$(volume_ids)"
+	done
+	_vol=$(for _v in ${_volids_new}; do echo "${_volids}" | fgrep -q $_v ||
+		echo $_v; done)
+
+	pr_action "waiting for completed conversion of volume for ${_vol}"
+	while /usr/bin/true; do
+		_state="$(volume_state ${_vol})"
+		[[ ${_state} == completed ]] && break
+		[[ ${_state} == active ]] && _progress="$(volume_progress ${_vol})"
+		[[ -n ${_progress} ]] && echo "${_progress}"
+		sleep 10
+	done
+
+	# XXX
+	#echo
+	#echo "deleting local and remote disk images"
+	#rm -rf ${_WRKDIR}
+	#ec2-delete-disk-image
+
+	pr_action "creating snapshot in region ${AWS_REGION}"
+	ec2-create-snapshot \
+	       -O "${AWS_ACCESS_KEY_ID}" \
+	       -W "${AWS_SECRET_ACCESS_KEY}" \
+		--region ${AWS_REGION} \
+		-d ${_IMGNAME} \
+		${_vol}
+	while [[ -z ${_snap} ]]; do
+		_snap=$(ec2-describe-snapshots \
+			-O "${AWS_ACCESS_KEY_ID}" \
+			-W "${AWS_SECRET_ACCESS_KEY}" \
+			--region ${AWS_REGION} 2>/dev/null |
+			grep "${_vol}" |
+			grep "completed.*${_IMGNAME}" |
+			grep -Eo "snap-[[:alnum:]]*") || true
+		sleep 10
+	done
+
+	pr_action "registering new AMI in region ${AWS_REGION}: ${_IMGNAME}"
+	ec2-register \
+		-n ${_IMGNAME} \
+		-O "${AWS_ACCESS_KEY_ID}" \
+		-W "${AWS_SECRET_ACCESS_KEY}" \
+		--region ${AWS_REGION} \
+		-a x86_64 \
+		-d "${DESCR}" \
+		--root-device-name /dev/sda1 \
+		--virtualization-type hvm \
+		-s ${_snap}
+}
+
+aws_volume_ids()
+{
+	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks |
+		python2 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"]) if "Id" in task["ImportVolume"]["Volume"] else None for task in json.load(sys.stdin)["ConversionTasks"]]'
+}
+
+aws_volume_progress()
+{
+	local _vol=$1
+	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks |
+		python2 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"],task["StatusMessage"]) if ("Id" in task["ImportVolume"]["Volume"] and "StatusMessage" in task) else None for task in json.load(sys.stdin)["ConversionTasks"]]' |
+		grep "${_vol}" | awk '{print $2,$3}'
+}
+
+aws_volume_state()
+{
+	local _vol=$1
+	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks |
+		python2 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"],task["State"]) if "Id" in task["ImportVolume"]["Volume"] else None for task in json.load(sys.stdin)["ConversionTasks"]]' |
+		grep "${_vol}" | awk '{print $NF}'
+}
+
 build_autoinstallconf()
 {
 	local _autoinstallconf=${_WRKDIR}/auto_install.conf
@@ -77,6 +175,7 @@ create_install_site()
 	# XXX
 	# bsd.mp + relink directory
 	# https://cdn.openbsd.org/pub/OpenBSD in installurl if MIRROR ~= file:/
+	# proxy support
 
 	cat <<-'EOF' >>${_WRKDIR}/install.site
 	ftp -V -o /usr/local/libexec/ec2-init \
@@ -220,6 +319,10 @@ trap exit HUP INT TERM
 
 _TS=$(date -u +%G%m%dT%H%M%SZ)
 _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-${AWS_ACCESS_KEY}}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-${AWS_SECRET_KEY}}
+AWS_REGION=${AWS_REGION:-eu-west-1}
+AWS_AZ=${AWS_AZ:-${AWS_REGION}a}
 CREATE_AMI=${CREATE_AMI:-true}
 IMGSIZE=${IMGSIZE:-10}
 MIRROR=${MIRROR:-cdn.openbsd.org}
@@ -231,8 +334,9 @@ _IMGNAME=openbsd-${RELEASE}-amd64-${_TS}
 ! [[ -z ${IMGPATH} ]] || IMGPATH=${_WRKDIR}/${_IMGNAME}
 DESCR=${DESCR:-${_IMGNAME}}
 
-readonly _IMGNAME _TS _WRKDIR CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF
-readonly RELEASE
+readonly AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION AWS_AZ
+readonly _IMGNAME _TS _WRKDIR
+readonly CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF RELEASE
 
 if [[ ! -f ${IMGPATH} ]]; then
 	(($(id -u) != 0)) && pr_err "${0##*/}: need root privileges"
@@ -262,4 +366,6 @@ if ${CREATE_AMI}; then
 		pr_err "${0##*/}: package \"ec2-api-tools\" is not installed"
 	type vmdktool >/dev/null 2>&1 ||
 		pr_err "${0##*/}: package \"vmdktool\" is not installed"
+	export _JAVA_OPTIONS=-Djava.io.tmpdir=${_WRKDIR}
+	aws_create_ami
 fi
