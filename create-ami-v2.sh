@@ -228,6 +228,8 @@ MIRROR=${MIRROR:-cdn.openbsd.org}
 NETCONF=${NETCONF:-false}
 RELEASE=${RELEASE:-snapshots}
 
+readonly _WRKDIR IMGSIZE MIRROR NETCONF RELEASE
+
 setup_vmd
 setup_pf
 setup_forwarding
