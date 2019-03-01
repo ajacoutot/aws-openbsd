@@ -62,12 +62,12 @@ create_img()
 	upobsd -V ${RELEASE} -a amd64 -i ${_WRKDIR}/auto_install.conf \
 		-o ${_WRKDIR}/bsd.rd
 
-	vmctl create ${_WRKDIR}/${_IMGNAME} -s ${IMGSIZE}G
+	vmctl create ${IMGPATH} -s ${IMGSIZE}G
 
 	(sleep 30 && vmctl wait ${_IMGNAME} && vmctl stop ${_IMGNAME} -f) &
 
-	vmctl start ${_IMGNAME} -b ${_WRKDIR}/bsd.rd -c -L \
-		-d ${_WRKDIR}/${_IMGNAME} -d ${_WRKDIR}/siteXX.img
+	vmctl start ${_IMGNAME} -b ${_WRKDIR}/bsd.rd -c -L -d ${IMGPATH} -d \
+		${_WRKDIR}/siteXX.img
 	# XXX handle installation error
 	# (e.g. ftp: raw.githubusercontent.com: no address associated with name)
 }
@@ -195,16 +195,18 @@ usage()
 	pr_err "usage: ${0##*/}
        -c -- autoconfigure pf(4) and enable IP forwarding
        -d -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
+       -i \"path to RAW image\" -- use image at path instead of creating one
        -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
-       -m -- only create a RAW image (don't convert to an AMI and push to AWS)
+       -n -- only create a RAW image (don't convert to an AMI and push to AWS)
        -r \"release\" -- e.g 6.5; default to \"snapshots\"
        -s \"image size in GB\" -- default to \"10\""
 }
 
-while getopts cd:m:nr:s: arg; do
+while getopts cd:i:m:nr:s: arg; do
 	case ${arg} in
 	c)	NETCONF=true ;;
 	d)	DESCR="${OPTARG}" ;;
+	i)	IMGPATH="${OPTARG}" ;;
 	m)	MIRROR="${OPTARG}" ;;
 	n)	CREATE_AMI=false ;;
 	r)	RELEASE="${OPTARG}" ;;
@@ -213,7 +215,11 @@ while getopts cd:m:nr:s: arg; do
 	esac
 done
 
+trap 'trap_handler' EXIT
+trap exit HUP INT TERM
+
 _TS=$(date -u +%G%m%dT%H%M%SZ)
+_WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
 CREATE_AMI=${CREATE_AMI:-true}
 IMGSIZE=${IMGSIZE:-10}
 MIRROR=${MIRROR:-cdn.openbsd.org}
@@ -222,15 +228,25 @@ RELEASE=${RELEASE:-snapshots}
 _IMGNAME=openbsd-${RELEASE}-amd64-${_TS}
 ! [[ ${RELEASE} == snapshots ]] ||
 	_IMGNAME=${_IMGNAME%snapshots*}current${_IMGNAME#*snapshots}
+! [[ -z ${IMGPATH} ]] || IMGPATH=${_WRKDIR}/${_IMGNAME}
 DESCR=${DESCR:-${_IMGNAME}}
-readonly _IMGNAME _TS CREATE_AMI DESCR IMGSIZE MIRROR NETCONF RELEASE
 
-# check for requirements
-(($(id -u) != 0)) && pr_err "${0##*/}: need root privileges"
-[[ $(uname -m) != amd64 ]] && pr_err "${0##*/}: only supports amd64"
-[[ -z $(dmesg | grep ^vmm0 | tail -1) ]] &&
-	pr_err "${0##*/}: need vmm(4) support"
-type upobsd >/dev/null 2>&1 || pr_err "package \"upobsd\" is not installed"
+readonly _IMGNAME _TS _WRKDIR CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF
+readonly RELEASE
+
+if [[ ! -f ${IMGPATH} ]]; then
+	(($(id -u) != 0)) && pr_err "${0##*/}: need root privileges"
+	[[ $(uname -m) != amd64 ]] && pr_err "${0##*/}: only supports amd64"
+	[[ -z $(dmesg | grep ^vmm0 | tail -1) ]] &&
+		pr_err "${0##*/}: need vmm(4) support"
+	type upobsd >/dev/null 2>&1 ||
+		pr_err "package \"upobsd\" is not installed"
+	setup_vmd
+	setup_pf
+	setup_forwarding
+	create_img
+fi
+
 if ${CREATE_AMI}; then
 	# XXX seems the aws cli does more checking on the image than the ec2
 	# tools, preventing creating an OpenBSD AMI; so we need java for now :-(
@@ -244,13 +260,3 @@ if ${CREATE_AMI}; then
 	type vmdktool >/dev/null 2>&1 ||
 		pr_err "package \"vmdktool\" is not installed"
 fi
-
-trap 'trap_handler' EXIT
-trap exit HUP INT TERM
-
-readonly _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
-
-setup_vmd
-setup_pf
-setup_forwarding
-create_img
