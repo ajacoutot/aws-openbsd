@@ -229,7 +229,7 @@ MIRROR=${MIRROR:-cdn.openbsd.org}
 NETCONF=${NETCONF:-false}
 RELEASE=${RELEASE:-snapshots}
 
-_IMGNAME=openbsd-${RELEASE}-${_TS}
+_IMGNAME=openbsd-${RELEASE}-amd64-${_TS}
 ! [[ ${RELEASE} == snapshots ]] ||
 	_IMGNAME=${_IMGNAME%snapshots*}current${_IMGNAME#*snapshots}
 
