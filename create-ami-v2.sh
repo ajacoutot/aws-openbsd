@@ -240,7 +240,7 @@ if [[ ! -f ${IMGPATH} ]]; then
 	[[ -z $(dmesg | grep ^vmm0 | tail -1) ]] &&
 		pr_err "${0##*/}: need vmm(4) support"
 	type upobsd >/dev/null 2>&1 ||
-		pr_err "package \"upobsd\" is not installed"
+		pr_err "${0##*/}: package \"upobsd\" is not installed"
 	setup_vmd
 	setup_pf
 	setup_forwarding
@@ -248,6 +248,9 @@ if [[ ! -f ${IMGPATH} ]]; then
 fi
 
 if ${CREATE_AMI}; then
+	[[ -n ${AWS_ACCESS_KEY_ID} && -n ${AWS_SECRET_ACCESS_KEY} ]] ||
+		pr_err "${0##*/}: AWS credentials aren't set
+(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)"
 	# XXX seems the aws cli does more checking on the image than the ec2
 	# tools, preventing creating an OpenBSD AMI; so we need java for now :-(
 	[[ -n ${JAVA_HOME} ]] ||
@@ -256,7 +259,7 @@ if ${CREATE_AMI}; then
 	type ec2-import-volume >/dev/null 2>&1 ||
 		export PATH=${EC2_HOME}/bin:${PATH}
 	type ec2-import-volume >/dev/null 2>&1 ||
-		pr_err "package \"ec2-api-tools\" is not installed"
+		pr_err "${0##*/}: package \"ec2-api-tools\" is not installed"
 	type vmdktool >/dev/null 2>&1 ||
-		pr_err "package \"vmdktool\" is not installed"
+		pr_err "${0##*/}: package \"vmdktool\" is not installed"
 fi
