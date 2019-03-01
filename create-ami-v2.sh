@@ -93,6 +93,29 @@ aws_create_ami() {
 		-s ${_snap}
 }
 
+aws_ec2_jvm_args()
+{
+	local _host _pass _port _user http_proxy
+
+	if [[ -n ${http_proxy} ]]; then
+		http_proxy=${http_proxy##*/}
+		_user=${http_proxy%%@*}
+		_user=${_user%:*}
+		_pass=${http_proxy%%@*}
+		_pass=${_pass#*:}
+		_host=${http_proxy##*@}
+		_host=${_host%%:*}
+		_port=${http_proxy##*:}
+		[[ ${_user} != ${_host} ]] || unset _pass _user
+		echo -n " -Dhttp.proxyHost=${_host}"
+		echo -n " -Dhttps.proxyHost=${_host}"
+		echo -n " -Dhttp.proxyPort=${_port}"
+		echo -n " -Dhttps.proxyPort=${_port}"
+		[[ -z ${_user} ]] || echo -n " -Dhttp.proxyUser=${_user}"
+		[[ -z ${_pass} ]] || echo -n " -Dhttp.proxyPassword=${_pass}"
+	fi
+}
+
 aws_volume_ids()
 {
 	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks |
@@ -367,5 +390,6 @@ if ${CREATE_AMI}; then
 	type vmdktool >/dev/null 2>&1 ||
 		pr_err "${0##*/}: package \"vmdktool\" is not installed"
 	export _JAVA_OPTIONS=-Djava.io.tmpdir=${_WRKDIR}
+	export EC2_JVM_ARGS="${EC2_JVM_ARGS} $(aws_ec2_jvm_args)"
 	aws_create_ami
 fi
