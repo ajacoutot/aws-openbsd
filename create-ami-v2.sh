@@ -21,10 +21,10 @@ aws_create_ami() {
 	local _progress _snap _state _v _vol _volids _volids_new
 	local _vmdkpath=${IMGPATH}.vmdk
 
-	pr_action "converting image to stream-based VMDK"
+	pr_title "converting image to stream-based VMDK"
 	vmdktool -v ${_vmdkpath} ${IMGPATH}
 
-	pr_action "uploading image to S3 and converting to volume in az ${AWS_AZ}"
+	pr_title "uploading image to S3 and converting to volume in az ${AWS_AZ}"
 	_volids="$(volume_ids)"
 	ec2-import-volume \
 		${_vmdkpath} \
@@ -47,7 +47,7 @@ aws_create_ami() {
 	_vol=$(for _v in ${_volids_new}; do echo "${_volids}" | fgrep -q $_v ||
 		echo $_v; done)
 
-	pr_action "waiting for completed conversion of volume for ${_vol}"
+	pr_title "waiting for completed conversion of volume for ${_vol}"
 	while /usr/bin/true; do
 		_state="$(volume_state ${_vol})"
 		[[ ${_state} == completed ]] && break
@@ -62,7 +62,7 @@ aws_create_ami() {
 	#rm -rf ${_WRKDIR}
 	#ec2-delete-disk-image
 
-	pr_action "creating snapshot in region ${AWS_REGION}"
+	pr_title "creating snapshot in region ${AWS_REGION}"
 	ec2-create-snapshot \
 	       -O "${AWS_ACCESS_KEY_ID}" \
 	       -W "${AWS_SECRET_ACCESS_KEY}" \
@@ -80,7 +80,7 @@ aws_create_ami() {
 		sleep 10
 	done
 
-	pr_action "registering new AMI in region ${AWS_REGION}: ${_IMGNAME}"
+	pr_title "registering new AMI in region ${AWS_REGION}: ${_IMGNAME}"
 	ec2-register \
 		-n ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
@@ -253,6 +253,13 @@ create_install_site_disk()
 pr_err()
 {
 	echo "${1}" 1>&2 && return ${2:-1}
+}
+
+pr_title()
+{
+	echo "========================================================================="
+	echo "| ${@}"
+	echo "========================================================================="
 }
 
 setup_forwarding()
