@@ -108,7 +108,7 @@ create_install_site_disk()
 
 	create_install_site
 
-	vmctl create ${_siteimg} -s 1g
+	vmctl create ${_siteimg} -s 1G
 	vnconfig ${_vndev} ${_siteimg}
 	fdisk -iy ${_vndev}
 	echo "a a\n\n\n\nw\nq\n" | disklabel -E ${_vndev}
