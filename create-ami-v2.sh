@@ -36,7 +36,7 @@ aws_create_ami() {
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		-o "${AWS_ACCESS_KEY_ID}" \
 		-w "${AWS_SECRET_ACCESS_KEY}" \
-		-b ${_IMGNAME}
+		-b $(echo ${_IMGNAME} | tr '[:upper:]' '[:lower:]')
 
 	_volids_new="$(aws_volume_ids)"
 	echo
