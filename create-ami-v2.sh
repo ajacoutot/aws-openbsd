@@ -142,6 +142,8 @@ build_autoinstallconf()
 {
 	local _autoinstallconf=${_WRKDIR}/auto_install.conf
 
+	pr_title "creating auto_install.conf"
+
 	cat <<-EOF >>${_autoinstallconf}
 	System hostname = openbsd
 	Password for root = *************
@@ -180,8 +182,12 @@ create_img()
 	create_install_site_disk
 
 	build_autoinstallconf
+
+	pr_title "creating modified bsd.rd for autoinstall"
 	upobsd -V ${RELEASE} -a amd64 -i ${_WRKDIR}/auto_install.conf \
 		-o ${_WRKDIR}/bsd.rd
+
+	pr_title "starting autoinstall inside vmm(4)"
 
 	vmctl create ${IMGPATH} -s ${IMGSIZE}G
 
@@ -199,6 +205,8 @@ create_install_site()
 	# bsd.mp + relink directory
 	# https://cdn.openbsd.org/pub/OpenBSD in installurl if MIRROR ~= file:/
 	# proxy support
+
+	pr_title "creating install.site"
 
 	cat <<-'EOF' >>${_WRKDIR}/install.site
 	ftp -V -o /usr/local/libexec/ec2-init \
@@ -225,6 +233,8 @@ create_install_site_disk()
 	local _vndev="$(vnconfig -l | grep 'not in use' | head -1 |
 		cut -d ':' -f1)"
 	local _rel=$(uname -r)
+
+	pr_title "creating sd1 and storing siteXX.tgz"
 
 	[[ -z ${_vndev} ]] && pr_err "${0##*/}: no vnd(4) device available"
 
@@ -267,6 +277,7 @@ setup_forwarding()
 	! ${NETCONF} && return 0
 
 	if [[ $(sysctl -n net.inet.ip.forwarding) != 1 ]]; then
+		pr_title "enabling paquet forwarding"
 		RESET_FWD=true
 		sysctl -q net.inet.ip.forwarding=1
 	fi
@@ -277,6 +288,8 @@ setup_pf()
 	! ${NETCONF} && return 0
 
 	local _pfrules
+
+	pr_title "setting up pf(4) rules"
 
 	if ! $(pfctl -e >/dev/null); then
 		RESET_PF=true
@@ -289,7 +302,8 @@ setup_pf()
 setup_vmd()
 {
 	if ! $(rcctl check vmd >/dev/null); then
-		rcctl start vmd >/dev/null
+		pr_title "starting vmd(8)"
+		rcctl start vmd
 		RESET_VMD=true
 	fi
 }
@@ -299,23 +313,27 @@ trap_handler()
 	set +e # we're trapped
 
 	if ${RESET_VMD:-false}; then
+		pr_title "stopping vmd(8)"
 		rcctl stop vmd >/dev/null
 	fi
 
 	if ${RESET_PF:-false}; then
+		pr_title "disabling pf(4)"
 		pfctl -d >/dev/null
 		pfctl -F rules >/dev/null
 	elif ${NETCONF}; then
+		pr_title "restoring pf(4) rules"
 		pfctl -f /etc/pf.conf
 	fi
 
 	if ${RESET_FWD:-false}; then
+		pr_title "disabling paquet forwarding"
 		sysctl -q net.inet.ip.forwarding=0
 	fi
 
 	if [[ -n ${_WRKDIR} ]]; then
 		rmdir ${_WRKDIR} 2>/dev/null ||
-			echo "Work directory: ${_WRKDIR}"
+			pr_title "work directory: ${_WRKDIR}"
 	fi
 }
 
