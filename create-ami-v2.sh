@@ -23,7 +23,7 @@ build_autoinstallconf()
 
 	cat <<-EOF >>${_autoinstallconf}
 	System hostname = openbsd
-	Password for root = *
+	Password for root = *************
 	Change the default console to com0 = yes
 	Setup a user = ec2-user
 	Full name for user ec2-user = EC2 Default User 
