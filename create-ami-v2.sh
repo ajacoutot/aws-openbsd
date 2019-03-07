@@ -18,6 +18,7 @@ set -e
 umask 022
 
 aws_create_ami() {
+	local _bucketname=$(echo ${_IMGNAME} | tr '[:upper:]' '[:lower:]')-${RANDOM}
 	local _progress _snap _state _v _vol _volids _volids_new
 	local _vmdkpath=${IMGPATH}.vmdk
 
@@ -36,7 +37,7 @@ aws_create_ami() {
 		-W "${AWS_SECRET_ACCESS_KEY}" \
 		-o "${AWS_ACCESS_KEY_ID}" \
 		-w "${AWS_SECRET_ACCESS_KEY}" \
-		-b $(echo ${_IMGNAME} | tr '[:upper:]' '[:lower:]')
+		-b "${_bucketname}"
 
 	_volids_new="$(aws_volume_ids)"
 	echo
@@ -75,9 +76,7 @@ aws_create_ami() {
 		sleep 10
 	done
 
-	# XXX remove volume and s3 bucket; ec2-delete-disk-image ...
-
-	pr_title "registering new AMI in region ${AWS_REGION}: ${_IMGNAME}"
+	pr_title "registering new AMI ${_IMGNAME} in region ${AWS_REGION}"
 	ec2-register \
 		-n ${_IMGNAME} \
 		-O "${AWS_ACCESS_KEY_ID}" \
@@ -88,6 +87,10 @@ aws_create_ami() {
 		--root-device-name /dev/sda1 \
 		--virtualization-type hvm \
 		-s ${_snap}
+
+	pr_title "cleaning AWS resources needed to build and register the AMI"
+	aws --region ${AWS_REGION} s3 rb s3://${_bucketname} --force >/dev/null
+	aws --region ${AWS_REGION} ec2 delete-volume --volume-id ${_vol}
 }
 
 aws_ec2_jvm_args()
