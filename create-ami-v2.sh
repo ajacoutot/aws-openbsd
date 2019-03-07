@@ -384,6 +384,7 @@ readonly AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION AWS_AZ
 readonly _IMGNAME _TS _WRKDIR
 readonly CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF RELEASE
 
+# requirements checks to build the RAW image
 if [[ ! -f ${IMGPATH} ]]; then
 	(($(id -u) != 0)) && pr_err "${0##*/}: need root privileges"
 	[[ $(uname -m) != amd64 ]] && pr_err "${0##*/}: only supports amd64"
@@ -391,12 +392,9 @@ if [[ ! -f ${IMGPATH} ]]; then
 		pr_err "${0##*/}: need vmm(4) support"
 	type upobsd >/dev/null 2>&1 ||
 		pr_err "${0##*/}: package \"upobsd\" is not installed"
-	setup_vmd
-	setup_pf
-	setup_forwarding
-	create_img
 fi
 
+# requirements checks to build and register the AMI
 if ${CREATE_AMI}; then
 	[[ -n ${AWS_ACCESS_KEY_ID} && -n ${AWS_SECRET_ACCESS_KEY} ]] ||
 		pr_err "${0##*/}: AWS credentials aren't set
@@ -414,6 +412,16 @@ if ${CREATE_AMI}; then
 		pr_err "${0##*/}: package \"ec2-api-tools\" is not installed"
 	type vmdktool >/dev/null 2>&1 ||
 		pr_err "${0##*/}: package \"vmdktool\" is not installed"
+fi
+
+if [[ ! -f ${IMGPATH} ]]; then
+	setup_vmd
+	setup_pf
+	setup_forwarding
+	create_img
+fi
+
+if ${CREATE_AMI}; then
 	export _JAVA_OPTIONS=-Djava.io.tmpdir=${_WRKDIR}
 	export EC2_JVM_ARGS="${EC2_JVM_ARGS} $(aws_ec2_jvm_args)"
 	aws_create_ami
