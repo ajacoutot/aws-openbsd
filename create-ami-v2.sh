@@ -339,11 +339,11 @@ usage()
 {
 	pr_err "usage: ${0##*/}
        -c -- autoconfigure pf(4) and enable IP forwarding
-       -d -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
+       -d \"description\" -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
        -i \"path to RAW image\" -- use image at path instead of creating one
        -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
        -n -- only create a RAW image (don't convert to an AMI nor push to AWS)
-       -r \"release\" -- e.g 6.5; default to \"snapshots\"
+       -r \"release\" -- e.g \"6.5\"; default to \"snapshots\"
        -s \"image size in GB\" -- default to \"10\""
 }
 
