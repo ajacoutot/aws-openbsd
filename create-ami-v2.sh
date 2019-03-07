@@ -98,6 +98,8 @@ aws_ec2_jvm_args()
 	local _host _pass _port _user http_proxy
 
 	if [[ -n ${http_proxy} ]]; then
+		export HTTP_PROXY=${http_proxy}
+		export HTTPS_PROXY=${http_proxy}
 		http_proxy=${http_proxy##*/}
 		_user=${http_proxy%%@*}
 		_user=${_user%:*}
