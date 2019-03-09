@@ -17,130 +17,120 @@
 set -e
 umask 022
 
-aws_create_ami() {
-	local _bucketname=$(echo ${_IMGNAME} | tr '[:upper:]' '[:lower:]')-${RANDOM}
-	local _progress _snap _state _v _vol _volids _volids_new
-	local _vmdkpath=${IMGPATH}.vmdk
+create_ami() {
+	local _importsnapid _snap
 
 	pr_title "converting image to stream-based VMDK"
-	vmdktool -v ${_vmdkpath} ${IMGPATH}
+	vmdktool -v ${IMGPATH}.vmdk ${IMGPATH}
 
-	pr_title "uploading image to S3 and converting to volume in az ${AWS_AZ}"
-	_volids="$(aws_volume_ids)"
-	ec2-import-volume \
-		${_vmdkpath} \
-		-f vmdk \
-		--region ${AWS_REGION} \
-		-z ${AWS_AZ} \
-		-d ${_IMGNAME} \
-		-O "${AWS_ACCESS_KEY_ID}" \
-		-W "${AWS_SECRET_ACCESS_KEY}" \
-		-o "${AWS_ACCESS_KEY_ID}" \
-		-w "${AWS_SECRET_ACCESS_KEY}" \
-		-b "${_bucketname}"
+	pr_title "uploading image to S3 (${AWS_REGION})"
+	aws --region ${AWS_REGION} s3api create-bucket --bucket ${_BUCKETNAME} \
+		--create-bucket-configuration LocationConstraint=${AWS_REGION}
+	aws --region ${AWS_REGION} s3 cp ${IMGPATH}.vmdk s3://${_BUCKETNAME}
 
-	_volids_new="$(aws_volume_ids)"
-	echo
-	while [[ ${_volids} == ${_volids_new} ]]; do
-		sleep 10
-		_volids_new="$(aws_volume_ids)"
-	done
-	_vol=$(for _v in ${_volids_new}; do echo "${_volids}" | fgrep -q $_v ||
-		echo $_v; done)
+	pr_title "converting VMDK to snapshot"
+	cat <<-EOF >>${_WRKDIR}/containers.json
+	{
+	  "Description": "${DESCR}",
+	  "Format": "vmdk",
+	  "UserBucket": {
+	      "S3Bucket": "${_BUCKETNAME}",
+	      "S3Key": "${_IMGNAME}.vmdk"
+	  }
+	}
+	EOF
 
-	pr_title "waiting for completed conversion of volume for ${_vol}"
-	while /usr/bin/true; do
-		_state="$(aws_volume_state ${_vol})"
-		[[ ${_state} == completed ]] && break
-		[[ ${_state} == active ]] &&
-			_progress="$(aws_volume_progress ${_vol})"
-		[[ -n ${_progress} ]] && echo "${_progress}"
-		sleep 10
-	done
+	# Cannot use import-image: "ClientError: Unknown OS / Missing OS files."
+	#aws --region ${AWS_REGION} ec2 import-image --description "${DESCR}" \
+	#	--disk-containers file://"${_WRKDIR}/containers.json"
 
-	pr_title "creating snapshot in region ${AWS_REGION}"
-	ec2-create-snapshot \
-	       -O "${AWS_ACCESS_KEY_ID}" \
-	       -W "${AWS_SECRET_ACCESS_KEY}" \
-		--region ${AWS_REGION} \
-		-d ${_IMGNAME} \
-		${_vol}
-	while [[ -z ${_snap} ]]; do
-		_snap=$(ec2-describe-snapshots \
-			-O "${AWS_ACCESS_KEY_ID}" \
-			-W "${AWS_SECRET_ACCESS_KEY}" \
-			--region ${AWS_REGION} 2>/dev/null |
-			grep "${_vol}" |
-			grep "completed.*${_IMGNAME}" |
-			grep -Eo "snap-[[:alnum:]]*") || true
+	_importsnapid=$(aws --region ${AWS_REGION} ec2 import-snapshot \
+		--disk-container file://"${_WRKDIR}/containers.json" \
+		--role-name ${_IMGNAME} --query "ImportTaskId" --output text)
+
+	while true; do
+		set -A _snap -- $(aws --region ${AWS_REGION} ec2 \
+			describe-import-snapshot-tasks --output text \
+			--import-task-ids ${_importsnapid} --query \
+			"ImportSnapshotTasks[*].SnapshotTaskDetail.[Status,Progress,SnapshotId]")
+		echo -ne "\r Progress: ${_snap[1]}%"
+		[[ ${_snap[0]} == completed ]] && echo && break
 		sleep 10
 	done
 
-	pr_title "registering new AMI ${_IMGNAME} in region ${AWS_REGION}"
-	ec2-register \
-		-n ${_IMGNAME} \
-		-O "${AWS_ACCESS_KEY_ID}" \
-		-W "${AWS_SECRET_ACCESS_KEY}" \
-		--region ${AWS_REGION} \
-		-a x86_64 \
-		-d "${DESCR}" \
-		--root-device-name /dev/sda1 \
-		--virtualization-type hvm \
-		-s ${_snap}
+	pr_title "removing bucket ${_BUCKETNAME}"
+	aws --region ${AWS_REGION} s3 rb s3://${_BUCKETNAME} --force
 
-	pr_title "cleaning AWS resources needed to build and register the AMI"
-	aws --region ${AWS_REGION} s3 rb s3://${_bucketname} --force >/dev/null
-	aws --region ${AWS_REGION} ec2 delete-volume --volume-id ${_vol}
+	pr_title "registering AMI"
+	aws --region ${AWS_REGION} ec2 register-image --name "${_IMGNAME}" \
+		--architecture x86_64 --root-device-name /dev/sda1 \
+		--virtualization-type hvm --description "${DESCR}" \
+		--block-device-mappings \
+		DeviceName="/dev/sda1",Ebs={SnapshotId=${_snap[2]}}
 }
 
-aws_ec2_jvm_args()
+create_iam_role()
 {
-	local _host _pass _port _user http_proxy
+	pr_title "creating IAM role"
 
-	if [[ -n ${http_proxy} ]]; then
-		export HTTP_PROXY=${http_proxy}
-		export HTTPS_PROXY=${http_proxy}
-		http_proxy=${http_proxy##*/}
-		_user=${http_proxy%%@*}
-		_user=${_user%:*}
-		_pass=${http_proxy%%@*}
-		_pass=${_pass#*:}
-		_host=${http_proxy##*@}
-		_host=${_host%%:*}
-		_port=${http_proxy##*:}
-		[[ ${_user} != ${_host} ]] || unset _pass _user
-		echo -n " -Dhttp.proxyHost=${_host}"
-		echo -n " -Dhttps.proxyHost=${_host}"
-		echo -n " -Dhttp.proxyPort=${_port}"
-		echo -n " -Dhttps.proxyPort=${_port}"
-		[[ -z ${_user} ]] || echo -n " -Dhttp.proxyUser=${_user}"
-		[[ -z ${_pass} ]] || echo -n " -Dhttp.proxyPassword=${_pass}"
-	fi
+	cat <<-'EOF' >>${_WRKDIR}/trust-policy.json
+	{
+	   "Version": "2012-10-17",
+	   "Statement": [
+	      {
+	         "Effect": "Allow",
+	         "Principal": { "Service": "vmie.amazonaws.com" },
+	         "Action": "sts:AssumeRole",
+	         "Condition": {
+	            "StringEquals":{
+	               "sts:Externalid": "vmimport"
+	            }
+	         }
+	      }
+	   ]
+	}
+	EOF
+
+	cat <<-EOF >>${_WRKDIR}/role-policy.json
+	{
+	   "Version":"2012-10-17",
+	   "Statement":[
+	      {
+	         "Effect":"Allow",
+	         "Action":[
+	            "s3:GetBucketLocation",
+	            "s3:GetObject",
+	            "s3:ListBucket"
+	         ],
+	         "Resource":[
+	            "arn:aws:s3:::${_BUCKETNAME}",
+	            "arn:aws:s3:::${_BUCKETNAME}/*"
+	         ]
+	      },
+	      {
+	         "Effect":"Allow",
+	         "Action":[
+	            "ec2:ModifySnapshotAttribute",
+	            "ec2:CopySnapshot",
+	            "ec2:RegisterImage",
+	            "ec2:Describe*"
+	         ],
+	         "Resource":"*"
+	      }
+	   ]
+	}
+	EOF
+
+	aws --region ${AWS_REGION} iam create-role --role-name ${_IMGNAME} \
+		--assume-role-policy-document \
+		"file://${_WRKDIR}/trust-policy.json"
+
+	aws --region ${AWS_REGION} iam put-role-policy --role-name ${_IMGNAME} \
+		--policy-name ${_IMGNAME} --policy-document \
+		"file://${_WRKDIR}/role-policy.json"
 }
 
-aws_volume_ids()
-{
-	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks |
-		python2 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"]) if "Id" in task["ImportVolume"]["Volume"] else None for task in json.load(sys.stdin)["ConversionTasks"]]'
-}
-
-aws_volume_progress()
-{
-	local _vol=$1
-	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks |
-		python2 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"],task["StatusMessage"]) if ("Id" in task["ImportVolume"]["Volume"] and "StatusMessage" in task) else None for task in json.load(sys.stdin)["ConversionTasks"]]' |
-		grep "${_vol}" | awk '{print $2,$3}'
-}
-
-aws_volume_state()
-{
-	local _vol=$1
-	aws --region ${AWS_REGION} --output json ec2 describe-conversion-tasks |
-		python2 -c 'from __future__ import print_function;import sys,json; [print(task["ImportVolume"]["Volume"]["Id"],task["State"]) if "Id" in task["ImportVolume"]["Volume"] else None for task in json.load(sys.stdin)["ConversionTasks"]]' |
-		grep "${_vol}" | awk '{print $NF}'
-}
-
-build_autoinstallconf()
+create_autoinstallconf()
 {
 	local _autoinstallconf=${_WRKDIR}/auto_install.conf
 
@@ -183,7 +173,7 @@ create_img()
 {
 	create_install_site_disk
 
-	build_autoinstallconf
+	create_autoinstallconf
 
 	pr_title "creating modified bsd.rd for autoinstall"
 	upobsd -V ${RELEASE} -a amd64 -i ${_WRKDIR}/auto_install.conf \
@@ -315,9 +305,18 @@ trap_handler()
 {
 	set +e # we're trapped
 
-	if ${RESET_VMD:-false}; then
-		pr_title "stopping vmd(8)"
-		rcctl stop vmd >/dev/null
+	if aws --region ${AWS_REGION} iam get-role --role-name ${_IMGNAME} \
+		>/dev/null 2>&1; then
+		pr_title "removing IAM role"
+		aws --region ${AWS_REGION} iam delete-role-policy --role-name \
+			${_IMGNAME} --policy-name ${_IMGNAME} 2>/dev/null
+		aws --region ${AWS_REGION} iam delete-role --role-name \
+			${_IMGNAME} 2>/dev/null
+	fi
+
+	if ${RESET_FWD:-false}; then
+		pr_title "disabling paquet forwarding"
+		sysctl -q net.inet.ip.forwarding=0
 	fi
 
 	if ${RESET_PF:-false}; then
@@ -329,9 +328,9 @@ trap_handler()
 		pfctl -f /etc/pf.conf
 	fi
 
-	if ${RESET_FWD:-false}; then
-		pr_title "disabling paquet forwarding"
-		sysctl -q net.inet.ip.forwarding=0
+	if ${RESET_VMD:-false}; then
+		pr_title "stopping vmd(8)"
+		rcctl stop vmd >/dev/null
 	fi
 
 	if [[ -n ${_WRKDIR} ]]; then
@@ -370,6 +369,12 @@ trap exit HUP INT TERM
 
 _TS=$(date -u +%G%m%dT%H%M%SZ)
 _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
+
+if [[ -n ${http_proxy} ]]; then
+	export HTTP_PROXY=${http_proxy}
+	export HTTPS_PROXY=${http_proxy}
+fi
+
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-${AWS_ACCESS_KEY}}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-${AWS_SECRET_KEY}}
 AWS_REGION=${AWS_REGION:-eu-west-1}
@@ -379,20 +384,25 @@ IMGSIZE=${IMGSIZE:-10}
 MIRROR=${MIRROR:-cdn.openbsd.org}
 NETCONF=${NETCONF:-false}
 RELEASE=${RELEASE:-snapshots}
+
 _IMGNAME=openbsd-${RELEASE}-amd64-${_TS}
-! [[ ${RELEASE} == snapshots ]] ||
+[[ ${RELEASE} != snapshots ]] &&
 	_IMGNAME=${_IMGNAME%snapshots*}current${_IMGNAME#*snapshots}
-! [[ -z ${IMGPATH} ]] || IMGPATH=${_WRKDIR}/${_IMGNAME}
+[[ -n ${IMGPATH} ]] && _IMGNAME=${IMGPATH##*/} ||
+	IMGPATH=${_WRKDIR}/${_IMGNAME}
+_BUCKETNAME=$(echo ${_IMGNAME} | tr '[:upper:]' '[:lower:]')-${RANDOM}
 DESCR=${DESCR:-${_IMGNAME}}
 
 readonly AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION AWS_AZ
-readonly _IMGNAME _TS _WRKDIR
+readonly _BUCKETNAME _IMGNAME _TS _WRKDIR HTTP_PROXY HTTPS_PROXY
 readonly CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF RELEASE
 
 # requirements checks to build the RAW image
 if [[ ! -f ${IMGPATH} ]]; then
 	(($(id -u) != 0)) && pr_err "${0##*/}: need root privileges"
 	[[ $(uname -m) != amd64 ]] && pr_err "${0##*/}: only supports amd64"
+	[[ ${_IMGNAME}} != [[:alpha:]]* ]] &&
+		pr_err "${0##*/}: image name must start with a letter"
 	[[ -z $(cat /var/run/dmesg.boot | grep ^vmm0 | tail -1) ]] &&
 		pr_err "${0##*/}: need vmm(4) support"
 	type upobsd >/dev/null 2>&1 ||
@@ -406,15 +416,6 @@ if ${CREATE_AMI}; then
 (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)"
 	type aws >/dev/null 2>&1 ||
 		pr_err "${0##*/}: package \"awscli\" is not installed"
-	# XXX seems the aws cli does more checking on the image than the ec2
-	# tools, preventing creating an OpenBSD AMI; so we need java for now :-(
-	[[ -n ${JAVA_HOME} ]] ||
-		export JAVA_HOME=$(javaPathHelper -h ec2-api-tools) 2>/dev/null
-	[[ -n ${EC2_HOME} ]] || export EC2_HOME=/usr/local/ec2-api-tools
-	type ec2-import-volume >/dev/null 2>&1 ||
-		export PATH=${EC2_HOME}/bin:${PATH}
-	type ec2-import-volume >/dev/null 2>&1 ||
-		pr_err "${0##*/}: package \"ec2-api-tools\" is not installed"
 	type vmdktool >/dev/null 2>&1 ||
 		pr_err "${0##*/}: package \"vmdktool\" is not installed"
 fi
@@ -427,7 +428,6 @@ if [[ ! -f ${IMGPATH} ]]; then
 fi
 
 if ${CREATE_AMI}; then
-	export _JAVA_OPTIONS=-Djava.io.tmpdir=${_WRKDIR}
-	export EC2_JVM_ARGS="${EC2_JVM_ARGS} $(aws_ec2_jvm_args)"
-	aws_create_ami
+	create_iam_role
+	create_ami
 fi
