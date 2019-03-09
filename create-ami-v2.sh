@@ -407,7 +407,7 @@ fi
 
 # requirements checks to build and register the AMI
 if ${CREATE_AMI}; then
-	AWS_DEFAULT_PROFILE=${AWS_DEFAULT_PROFILE:-default}
+	readonly AWS_DEFAULT_PROFILE=${AWS_DEFAULT_PROFILE:-default}
 	type aws >/dev/null 2>&1 || pr_err "package \"awscli\" is not installed"
 	type vmdktool >/dev/null 2>&1 ||
 		pr_err "package \"vmdktool\" is not installed"
