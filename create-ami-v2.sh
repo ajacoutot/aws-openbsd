@@ -69,6 +69,45 @@ create_ami() {
 		DeviceName="/dev/sda1",Ebs={SnapshotId=${_snap[2]}}
 }
 
+create_autoinstallconf()
+{
+	local _autoinstallconf=${_WRKDIR}/auto_install.conf
+
+	pr_title "creating auto_install.conf"
+
+	cat <<-EOF >>${_autoinstallconf}
+	System hostname = openbsd
+	Password for root = *************
+	Change the default console to com0 = yes
+	Setup a user = ec2-user
+	Full name for user ec2-user = EC2 Default User
+	Password for user = *************
+	What timezone are you in = UTC
+	Location of sets = http
+	HTTP Server = ${MIRROR}
+	Server directory = pub/OpenBSD/${RELEASE}/amd64
+	Set name(s) = done
+	EOF
+
+	# XXX if checksum fails
+	for i in $(jot 11); do
+	        echo "Checksum test for = yes" >>${_autoinstallconf}
+	done
+	echo "Continue without verification = yes" >>${_autoinstallconf}
+
+	cat <<-'EOF' >>${_autoinstallconf}
+	Location of sets = disk
+	Is the disk partition already mounted = no
+	Which disk contains the install media = sd1
+	Which sd1 partition has the install sets = a
+	Pathname to the sets = /
+	INSTALL.amd64 not found. Use sets found here anyway = yes
+	Set name(s) = site*
+	Checksum test for = yes
+	Continue without verification = yes
+	EOF
+}
+
 create_iam_role()
 {
 	pr_title "creating IAM role"
@@ -128,45 +167,6 @@ create_iam_role()
 	aws iam put-role-policy --role-name ${_IMGNAME} --policy-name \
 		${_IMGNAME} --policy-document \
 		"file://${_WRKDIR}/role-policy.json"
-}
-
-create_autoinstallconf()
-{
-	local _autoinstallconf=${_WRKDIR}/auto_install.conf
-
-	pr_title "creating auto_install.conf"
-
-	cat <<-EOF >>${_autoinstallconf}
-	System hostname = openbsd
-	Password for root = *************
-	Change the default console to com0 = yes
-	Setup a user = ec2-user
-	Full name for user ec2-user = EC2 Default User 
-	Password for user = *************
-	What timezone are you in = UTC
-	Location of sets = http
-	HTTP Server = ${MIRROR}
-	Server directory = pub/OpenBSD/${RELEASE}/amd64
-	Set name(s) = done
-	EOF
-
-	# XXX if checksum fails
-	for i in $(jot 11); do
-	        echo "Checksum test for = yes" >>${_autoinstallconf}
-	done
-	echo "Continue without verification = yes" >>${_autoinstallconf}
-
-	cat <<-'EOF' >>${_autoinstallconf}
-	Location of sets = disk
-	Is the disk partition already mounted = no
-	Which disk contains the install media = sd1
-	Which sd1 partition has the install sets = a
-	Pathname to the sets = /
-	INSTALL.amd64 not found. Use sets found here anyway = yes
-	Set name(s) = site*
-	Checksum test for = yes
-	Continue without verification = yes
-	EOF
 }
 
 create_img()
