@@ -23,10 +23,11 @@ create_ami() {
 	pr_title "converting image to stream-based VMDK"
 	vmdktool -v ${IMGPATH}.vmdk ${IMGPATH}
 
-	pr_title "uploading image to S3 (${AWS_REGION})"
-	aws --region ${AWS_REGION} s3api create-bucket --bucket ${_BUCKETNAME} \
-		--create-bucket-configuration LocationConstraint=${AWS_REGION}
-	aws --region ${AWS_REGION} s3 cp ${IMGPATH}.vmdk s3://${_BUCKETNAME}
+	pr_title "uploading image to S3"
+	aws s3api create-bucket --bucket ${_BUCKETNAME} \
+		--create-bucket-configuration \
+		LocationConstraint=$(aws configure get region)
+	aws s3 cp ${IMGPATH}.vmdk s3://${_BUCKETNAME}
 
 	pr_title "converting VMDK to snapshot"
 	cat <<-EOF >>${_WRKDIR}/containers.json
@@ -41,17 +42,17 @@ create_ami() {
 	EOF
 
 	# Cannot use import-image: "ClientError: Unknown OS / Missing OS files."
-	#aws --region ${AWS_REGION} ec2 import-image --description "${DESCR}" \
-	#	--disk-containers file://"${_WRKDIR}/containers.json"
+	#aws ec2 import-image --description "${DESCR}" --disk-containers \
+	#	file://"${_WRKDIR}/containers.json"
 
-	_importsnapid=$(aws --region ${AWS_REGION} ec2 import-snapshot \
-		--disk-container file://"${_WRKDIR}/containers.json" \
-		--role-name ${_IMGNAME} --query "ImportTaskId" --output text)
+	_importsnapid=$(aws ec2 import-snapshot --disk-container \
+		file://"${_WRKDIR}/containers.json" --role-name ${_IMGNAME} \
+		--query "ImportTaskId" --output text)
 
 	while true; do
-		set -A _snap -- $(aws --region ${AWS_REGION} ec2 \
-			describe-import-snapshot-tasks --output text \
-			--import-task-ids ${_importsnapid} --query \
+		set -A _snap -- $(aws ec2 describe-import-snapshot-tasks \
+			--output text --import-task-ids ${_importsnapid} \
+			--query \
 			"ImportSnapshotTasks[*].SnapshotTaskDetail.[Status,Progress,SnapshotId]")
 		echo -ne "\r Progress: ${_snap[1]}%"
 		[[ ${_snap[0]} == completed ]] && echo && break
@@ -59,13 +60,12 @@ create_ami() {
 	done
 
 	pr_title "removing bucket ${_BUCKETNAME}"
-	aws --region ${AWS_REGION} s3 rb s3://${_BUCKETNAME} --force
+	aws s3 rb s3://${_BUCKETNAME} --force
 
 	pr_title "registering AMI"
-	aws --region ${AWS_REGION} ec2 register-image --name "${_IMGNAME}" \
-		--architecture x86_64 --root-device-name /dev/sda1 \
-		--virtualization-type hvm --description "${DESCR}" \
-		--block-device-mappings \
+	aws ec2 register-image --name "${_IMGNAME}" --architecture x86_64 \
+		--root-device-name /dev/sda1 --virtualization-type hvm \
+		--description "${DESCR}" --block-device-mappings \
 		DeviceName="/dev/sda1",Ebs={SnapshotId=${_snap[2]}}
 }
 
@@ -121,12 +121,12 @@ create_iam_role()
 	}
 	EOF
 
-	aws --region ${AWS_REGION} iam create-role --role-name ${_IMGNAME} \
+	aws iam create-role --role-name ${_IMGNAME} \
 		--assume-role-policy-document \
 		"file://${_WRKDIR}/trust-policy.json"
 
-	aws --region ${AWS_REGION} iam put-role-policy --role-name ${_IMGNAME} \
-		--policy-name ${_IMGNAME} --policy-document \
+	aws iam put-role-policy --role-name ${_IMGNAME} --policy-name \
+		${_IMGNAME} --policy-document \
 		"file://${_WRKDIR}/role-policy.json"
 }
 
@@ -232,7 +232,7 @@ create_install_site_disk()
 
 	pr_title "creating sd1 and storing siteXX.tgz"
 
-	[[ -z ${_vndev} ]] && pr_err "${0##*/}: no vnd(4) device available"
+	[[ -z ${_vndev} ]] && pr_err "no vnd(4) device available"
 
 	vmctl create ${_siteimg} -s 1G
 	vnconfig ${_vndev} ${_siteimg}
@@ -256,7 +256,7 @@ create_install_site_disk()
 
 pr_err()
 {
-	echo "${1}" 1>&2 && return ${2:-1}
+	echo "${0##*/}: ${1}" 1>&2 && return ${2:-1}
 }
 
 pr_title()
@@ -305,13 +305,11 @@ trap_handler()
 {
 	set +e # we're trapped
 
-	if aws --region ${AWS_REGION} iam get-role --role-name ${_IMGNAME} \
-		>/dev/null 2>&1; then
+	if aws iam get-role --role-name ${_IMGNAME} >/dev/null 2>&1; then
 		pr_title "removing IAM role"
-		aws --region ${AWS_REGION} iam delete-role-policy --role-name \
-			${_IMGNAME} --policy-name ${_IMGNAME} 2>/dev/null
-		aws --region ${AWS_REGION} iam delete-role --role-name \
-			${_IMGNAME} 2>/dev/null
+		aws iam delete-role-policy --role-name ${_IMGNAME} \
+			--policy-name ${_IMGNAME} 2>/dev/null
+		aws iam delete-role --role-name ${_IMGNAME} 2>/dev/null
 	fi
 
 	if ${RESET_FWD:-false}; then
@@ -341,7 +339,7 @@ trap_handler()
 
 usage()
 {
-	pr_err "usage: ${0##*/}
+	echo "usage: ${0##*/}
        -c -- autoconfigure pf(4) and enable IP forwarding
        -d \"description\" -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
        -i \"path to RAW image\" -- use image at path instead of creating one
@@ -349,6 +347,8 @@ usage()
        -n -- only create a RAW image (don't convert to an AMI nor push to AWS)
        -r \"release\" -- e.g \"6.5\"; default to \"snapshots\"
        -s \"image size in GB\" -- default to \"10\""
+
+	return 1
 }
 
 while getopts cd:i:m:nr:s: arg; do
@@ -370,15 +370,12 @@ trap exit HUP INT TERM
 _TS=$(date -u +%G%m%dT%H%M%SZ)
 _WRKDIR=$(mktemp -d -p ${TMPDIR:=/tmp} aws-ami.XXXXXXXXXX)
 
+# XXX add support for installation proxy in create_img
 if [[ -n ${http_proxy} ]]; then
 	export HTTP_PROXY=${http_proxy}
 	export HTTPS_PROXY=${http_proxy}
 fi
 
-AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-${AWS_ACCESS_KEY}}
-AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-${AWS_SECRET_KEY}}
-AWS_REGION=${AWS_REGION:-eu-west-1}
-AWS_AZ=${AWS_AZ:-${AWS_REGION}a}
 CREATE_AMI=${CREATE_AMI:-true}
 IMGSIZE=${IMGSIZE:-10}
 MIRROR=${MIRROR:-cdn.openbsd.org}
@@ -393,31 +390,32 @@ _IMGNAME=openbsd-${RELEASE}-amd64-${_TS}
 _BUCKETNAME=$(echo ${_IMGNAME} | tr '[:upper:]' '[:lower:]')-${RANDOM}
 DESCR=${DESCR:-${_IMGNAME}}
 
-readonly AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION AWS_AZ
 readonly _BUCKETNAME _IMGNAME _TS _WRKDIR HTTP_PROXY HTTPS_PROXY
 readonly CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF RELEASE
 
 # requirements checks to build the RAW image
 if [[ ! -f ${IMGPATH} ]]; then
-	(($(id -u) != 0)) && pr_err "${0##*/}: need root privileges"
-	[[ $(uname -m) != amd64 ]] && pr_err "${0##*/}: only supports amd64"
+	(($(id -u) != 0)) && pr_err "need root privileges"
+	[[ $(uname -m) != amd64 ]] && pr_err "only supports amd64"
 	[[ ${_IMGNAME}} != [[:alpha:]]* ]] &&
-		pr_err "${0##*/}: image name must start with a letter"
+		pr_err "image name must start with a letter"
 	[[ -z $(cat /var/run/dmesg.boot | grep ^vmm0 | tail -1) ]] &&
-		pr_err "${0##*/}: need vmm(4) support"
+		pr_err "need vmm(4) support"
 	type upobsd >/dev/null 2>&1 ||
-		pr_err "${0##*/}: package \"upobsd\" is not installed"
+		pr_err "package \"upobsd\" is not installed"
 fi
 
 # requirements checks to build and register the AMI
 if ${CREATE_AMI}; then
-	[[ -n ${AWS_ACCESS_KEY_ID} && -n ${AWS_SECRET_ACCESS_KEY} ]] ||
-		pr_err "${0##*/}: AWS credentials aren't set
-(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)"
-	type aws >/dev/null 2>&1 ||
-		pr_err "${0##*/}: package \"awscli\" is not installed"
+	AWS_DEFAULT_PROFILE=${AWS_DEFAULT_PROFILE:-default}
+	type aws >/dev/null 2>&1 || pr_err "package \"awscli\" is not installed"
 	type vmdktool >/dev/null 2>&1 ||
-		pr_err "${0##*/}: package \"vmdktool\" is not installed"
+		pr_err "package \"vmdktool\" is not installed"
+	aws ec2 describe-regions --region-names us-east-1 >/dev/null ||
+		pr_err "you may need to export:
+AWS_CONFIG_FILE
+AWS_DEFAULT_PROFILE
+AWS_SHARED_CREDENTIALS_FILE"
 fi
 
 if [[ ! -f ${IMGPATH} ]]; then
