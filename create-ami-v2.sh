@@ -14,6 +14,8 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+# XXXTODO arm64 support
+
 set -e
 umask 022
 
@@ -85,7 +87,7 @@ create_autoinstallconf()
 	What timezone are you in = UTC
 	Location of sets = http
 	HTTP Server = ${MIRROR}
-	Server directory = pub/OpenBSD/${RELEASE}/amd64
+	Server directory = pub/OpenBSD/${RELEASE}/${ARCH}
 	Set name(s) = done
 	EOF
 
@@ -95,13 +97,13 @@ create_autoinstallconf()
 	done
 	echo "Continue without verification = yes" >>${_autoinstallconf}
 
-	cat <<-'EOF' >>${_autoinstallconf}
+	cat <<-EOF >>${_autoinstallconf}
 	Location of sets = disk
 	Is the disk partition already mounted = no
 	Which disk contains the install media = sd1
 	Which sd1 partition has the install sets = a
 	Pathname to the sets = /
-	INSTALL.amd64 not found. Use sets found here anyway = yes
+	INSTALL.${ARCH} not found. Use sets found here anyway = yes
 	Set name(s) = site*
 	Checksum test for = yes
 	Continue without verification = yes
@@ -176,7 +178,7 @@ create_img()
 	create_autoinstallconf
 
 	pr_title "creating modified bsd.rd for autoinstall"
-	upobsd -V ${RELEASE} -a amd64 -i ${_WRKDIR}/auto_install.conf \
+	upobsd -V ${RELEASE} -a ${ARCH} -i ${_WRKDIR}/auto_install.conf \
 		-o ${_WRKDIR}/bsd.rd
 
 	pr_title "starting autoinstall inside vmm(4)"
@@ -340,6 +342,7 @@ trap_handler()
 usage()
 {
 	echo "usage: ${0##*/}
+       -a \"architecture\" -- architecture, default to \"amd64\"
        -c -- autoconfigure pf(4) and enable IP forwarding
        -d \"description\" -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
        -i \"path to RAW image\" -- use image at path instead of creating one
@@ -351,8 +354,9 @@ usage()
 	return 1
 }
 
-while getopts cd:i:m:nr:s: arg; do
+while getopts a:cd:i:m:nr:s: arg; do
 	case ${arg} in
+	a)	ARCH="${OPTARG}" ;;
 	c)	NETCONF=true ;;
 	d)	DESCR="${OPTARG}" ;;
 	i)	IMGPATH="${OPTARG}" ;;
@@ -376,13 +380,14 @@ if [[ -n ${http_proxy} ]]; then
 	export HTTPS_PROXY=${http_proxy}
 fi
 
+ARCH=${ARCH:-amd64}
 CREATE_AMI=${CREATE_AMI:-true}
 IMGSIZE=${IMGSIZE:-10}
 MIRROR=${MIRROR:-cdn.openbsd.org}
 NETCONF=${NETCONF:-false}
 RELEASE=${RELEASE:-snapshots}
 
-_IMGNAME=openbsd-${RELEASE}-amd64-${_TS}
+_IMGNAME=openbsd-${RELEASE}-${ARCH}-${_TS}
 [[ ${RELEASE} != snapshots ]] &&
 	_IMGNAME=${_IMGNAME%snapshots*}current${_IMGNAME#*snapshots}
 [[ -n ${IMGPATH} ]] && _IMGNAME=${IMGPATH##*/} ||
@@ -396,11 +401,10 @@ readonly CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF RELEASE
 # requirements checks to build the RAW image
 if [[ ! -f ${IMGPATH} ]]; then
 	(($(id -u) != 0)) && pr_err "need root privileges"
-	[[ $(uname -m) != amd64 ]] && pr_err "only supports amd64"
-	[[ ${_IMGNAME}} != [[:alpha:]]* ]] &&
-		pr_err "image name must start with a letter"
 	[[ -z $(cat /var/run/dmesg.boot | grep ^vmm0 | tail -1) ]] &&
 		pr_err "need vmm(4) support"
+	[[ ${_IMGNAME}} != [[:alpha:]]* ]] &&
+		pr_err "image name must start with a letter"
 	type upobsd >/dev/null 2>&1 ||
 		pr_err "package \"upobsd\" is not installed"
 fi
