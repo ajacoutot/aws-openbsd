@@ -14,7 +14,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# XXXTODO arm64 support
+# TODO: arm64 support
 
 set -e
 umask 022
@@ -194,15 +194,12 @@ create_img()
 		${_WRKDIR}/siteXX.img
 	# XXX handle installation error
 	# (e.g. ftp: raw.githubusercontent.com: no address associated with name)
-
 	# XXX handle EOT
 }
 
 create_install_site()
 {
-	# XXX
-	# bsd.mp + relink directory
-	# proxy support
+	# XXX bsd.mp + relink directory
 
 	pr_title "creating install.site"
 
@@ -266,10 +263,6 @@ create_install_site_disk()
 	cd ${_WRKDIR} && tar czf \
 		${_sitemnt}/${_rel}/${ARCH}/site${_rel%.[0-9]}${_rel#[0-9].}.tgz \
 			./install.site
-
-#	if [[ ${MIRROR} == file://* ]]; then
-#		cp -a ${MIRROR}/* ${_sitemnt}/${_rel}/${ARCH}
-#	fi
 
 	umount ${_sitemnt}
 	vnconfig -u ${_vndev}
