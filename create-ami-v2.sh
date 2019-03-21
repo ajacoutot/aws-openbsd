@@ -202,7 +202,6 @@ create_install_site()
 {
 	# XXX
 	# bsd.mp + relink directory
-	# https://cdn.openbsd.org/pub/OpenBSD in installurl if MIRROR ~= file:/
 	# proxy support
 
 	pr_title "creating install.site"
@@ -216,6 +215,7 @@ create_install_site()
 	echo "!/usr/local/libexec/ec2-init" >>/etc/hostname.vio0
 	cp -p /etc/hostname.vio0 /etc/hostname.xnf0
 
+	echo "https://cdn.openbsd.org/pub/OpenBSD" >/etc/installurl
 	echo "sndiod_flags=NO" >/etc/rc.conf.local
 	echo "permit keepenv nopass ec2-user" >/etc/doas.conf
 
@@ -256,10 +256,10 @@ create_install_site_disk()
 	_lrel=${_rel%.*}
 	_rrel=${_rel#*.}
 	if [[ ${_rrel} == 9 ]]; then
-		# ln 5.9 6.0
+		# e.g. ln 5.9 6.0
 		(cd ${_sitemnt} && ln -s ${_rel} $((_lrel+1)).0)
 	else
-		# ln 5.8 5.9
+		# e.g. ln 5.8 5.9
 		(cd ${_sitemnt} && ln -s ${_rel} ${_lrel}.$((_rrel+1)))
 	fi
 
