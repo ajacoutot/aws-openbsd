@@ -106,7 +106,6 @@ create_autoinstallconf()
 	Is the disk partition already mounted = no
 	Which disk contains the install media = sd1
 	Which sd1 partition has the install sets = a
-	Pathname to the sets = /
 	INSTALL.${ARCH} not found. Use sets found here anyway = yes
 	Set name(s) = site*
 	Checksum test for = yes
@@ -229,10 +228,12 @@ create_install_site()
 create_install_site_disk()
 {
 	# XXX trap vnd and mount
+	local _lrel _rel _rrel
 	local _siteimg=${_WRKDIR}/siteXX.img _sitemnt=${_WRKDIR}/siteXX
 	local _vndev="$(vnconfig -l | grep 'not in use' | head -1 |
 		cut -d ':' -f1)"
-	local _rel=$(uname -r)
+
+	[[ ${RELEASE} == snapshots ]] && _rel=$(uname -r) || _rel=${RELEASE}
 
 	create_install_site
 
@@ -248,13 +249,27 @@ create_install_site_disk()
 
 	install -d ${_sitemnt}
 	mount /dev/${_vndev}a ${_sitemnt}
+	install -d ${_sitemnt}/${_rel}/${ARCH}
 
-	_rel=${_rel%.[0-9]}${_rel#[0-9].}
-	cd ${_WRKDIR} && tar czf ${_sitemnt}/site${_rel}.tgz ./install.site
 	# in case we're running an X.Y snapshot while X.Z is out;
 	# (e.g. running on 6.4-current and installing 6.5-beta)
-	let _rel++
-	cd ${_WRKDIR} && tar czf ${_sitemnt}/site${_rel}.tgz ./install.site
+	_lrel=${_rel%.*}
+	_rrel=${_rel#*.}
+	if [[ ${_rrel} == 9 ]]; then
+		# ln 5.9 6.0
+		(cd ${_sitemnt} && ln -s ${_rel} $((_lrel+1)).0)
+	else
+		# ln 5.8 5.9
+		(cd ${_sitemnt} && ln -s ${_rel} ${_lrel}.$((_rrel+1)))
+	fi
+
+	cd ${_WRKDIR} && tar czf \
+		${_sitemnt}/${_rel}/${ARCH}/site${_rel%.[0-9]}${_rel#[0-9].}.tgz \
+			./install.site
+
+#	if [[ ${MIRROR} == file://* ]]; then
+#		cp -a ${MIRROR}/* ${_sitemnt}/${_rel}/${ARCH}
+#	fi
 
 	umount ${_sitemnt}
 	vnconfig -u ${_vndev}
@@ -392,7 +407,7 @@ NETCONF=${NETCONF:-false}
 RELEASE=${RELEASE:-snapshots}
 
 _IMGNAME=openbsd-${RELEASE}-${ARCH}-${_TS}
-[[ ${RELEASE} != snapshots ]] &&
+[[ ${RELEASE} == snapshots ]] &&
 	_IMGNAME=${_IMGNAME%snapshots*}current${_IMGNAME#*snapshots}
 [[ -n ${IMGPATH} ]] && _IMGNAME=${IMGPATH##*/} ||
 	IMGPATH=${_WRKDIR}/${_IMGNAME}
