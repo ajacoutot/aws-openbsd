@@ -20,7 +20,11 @@ set -e
 umask 022
 
 create_ami() {
-	local _importsnapid _snap
+	local _arch=${ARCH} _importsnapid _snap
+
+	if [[ ${_arch} == amd64 ]]; then
+		_arch=x86_64
+	fi
 
 	pr_title "converting image to stream-based VMDK"
 	vmdktool -v ${IMGPATH}.vmdk ${IMGPATH}
@@ -65,7 +69,7 @@ create_ami() {
 	aws s3 rb s3://${_BUCKETNAME} --force
 
 	pr_title "registering AMI"
-	aws ec2 register-image --name "${_IMGNAME}" --architecture x86_64 \
+	aws ec2 register-image --name "${_IMGNAME}" --architecture ${_arch} \
 		--root-device-name /dev/sda1 --virtualization-type hvm \
 		--description "${DESCR}" --block-device-mappings \
 		DeviceName="/dev/sda1",Ebs={SnapshotId=${_snap[2]}}
@@ -342,7 +346,7 @@ trap_handler()
 usage()
 {
 	echo "usage: ${0##*/}
-       -a \"architecture\" -- architecture, default to \"amd64\"
+       -a \"architecture\" -- default to \"amd64\"
        -c -- autoconfigure pf(4) and enable IP forwarding
        -d \"description\" -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
        -i \"path to RAW image\" -- use image at path instead of creating one
