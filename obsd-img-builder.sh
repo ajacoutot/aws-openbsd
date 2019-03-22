@@ -421,8 +421,7 @@ readonly CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF RELEASE
 # requirements checks to build the RAW image
 if [[ ! -f ${IMGPATH} ]]; then
 	(($(id -u) != 0)) && pr_err "need root privileges"
-	[[ -z $(cat /var/run/dmesg.boot | grep ^vmm0 | tail -1) ]] &&
-		pr_err "need vmm(4) support"
+	grep -q ^vmm0 /var/run/dmesg.boot || pr_err "need vmm(4) support"
 	[[ ${_IMGNAME}} != [[:alpha:]]* ]] &&
 		pr_err "image name must start with a letter"
 	type upobsd >/dev/null 2>&1 ||
