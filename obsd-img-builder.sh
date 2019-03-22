@@ -184,7 +184,7 @@ create_img()
 
 	vmctl create ${IMGPATH} -s ${IMGSIZE}G
 
-	# handle EOT
+	# handle cu(1) EOT
 	(sleep 10 && vmctl wait ${_IMGNAME} && _tty=$(get_tty ${_IMGNAME}) &&
 		vmctl stop ${_IMGNAME} -f && pkill -f "/usr/bin/cu -l ${_tty}")&
 
