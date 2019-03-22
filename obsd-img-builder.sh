@@ -293,7 +293,7 @@ setup_forwarding()
 
 	if [[ $(sysctl -n net.inet.ip.forwarding) != 1 ]]; then
 		pr_title "enabling paquet forwarding"
-		RESET_FWD=true
+		_RESET_FWD=true
 		sysctl -q net.inet.ip.forwarding=1
 	fi
 }
@@ -307,7 +307,7 @@ setup_pf()
 	pr_title "setting up pf(4) rules"
 
 	if ! $(pfctl -e >/dev/null); then
-		RESET_PF=true
+		_RESET_PF=true
 	fi
 	print -- "pass out on egress from 100.64.0.0/10 to any nat-to (egress)
 		  pass in proto { tcp, udp } from 100.64.0.0/10 to any port domain rdr-to 1.1.1.1" |
@@ -319,7 +319,7 @@ setup_vmd()
 	if ! $(rcctl check vmd >/dev/null); then
 		pr_title "starting vmd(8)"
 		rcctl start vmd
-		RESET_VMD=true
+		_RESET_VMD=true
 	fi
 }
 
@@ -334,12 +334,12 @@ trap_handler()
 		aws iam delete-role --role-name ${_IMGNAME} 2>/dev/null
 	fi
 
-	if ${RESET_FWD:-false}; then
+	if ${_RESET_FWD:-false}; then
 		pr_title "disabling paquet forwarding"
 		sysctl -q net.inet.ip.forwarding=0
 	fi
 
-	if ${RESET_PF:-false}; then
+	if ${_RESET_PF:-false}; then
 		pr_title "disabling pf(4)"
 		pfctl -d >/dev/null
 		pfctl -F rules >/dev/null
@@ -348,7 +348,7 @@ trap_handler()
 		pfctl -f /etc/pf.conf
 	fi
 
-	if ${RESET_VMD:-false}; then
+	if ${_RESET_VMD:-false}; then
 		pr_title "stopping vmd(8)"
 		rcctl stop vmd >/dev/null
 	fi
