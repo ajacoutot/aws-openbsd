@@ -4,207 +4,331 @@ AWS playground for OpenBSD kids.
 
 Running whatever is in this repo will propably end up destroying a kitten factory.
 
+## Prerequisites for obsd-img-builder.sh (OpenBSD AMI builder)
 
-## Prerequisites
-
-* shell access to OpenBSD 6.1 with internet connection available.
-* minimum 12GB free space of /tmp (8GB for disk image and ~4GB for temporary files).
-* doas configured; for building as a root the "permit nopass keepenv root as root" in /etc/doas.conf is enough.
-* curl, ec2-api-tools, awscli and vmdktool packages installed.
-* shell environment variables available.
-
-    export AWS_ACCESS_KEY_ID=YOUR_AWS_ACCES_KEY;  
-    export AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_KEY;  
-
-* Identity and Access Management on AWS configured.
-
-> YOUR_AWS_ACCES_KEY and YOUR_AWS_SECRET_KEY should have AmazonEC2FullAccess and AmazonS3FullAccess policies assigned.
-
+* shell access to OpenBSD (preferably current) with vmm(4) support and Internet access
+* 3GB of free space in ${TMPDIR}
+* *awscli*, *upobsd* and *vmdktool* packages installed
+* AWS IAM user with enough permissions (AmazonEC2FullAccess, AmazonS3FullAccess, IAMFullAccess)
+  * AWS environment variables properly set (when not use root's awscli configuration):
+    * *AWS_CONFIG_FILE*
+    * *AWS_DEFAULT_PROFILE* (when not using the *default* profile)
+    * *AWS_SHARED_CREDENTIALS_FILE*
 
 ## Script usage
 
-```shell
-create-ami.sh [-dinsr]
-    -d "description"
-    -i "/path/to/image"
-    -n only create the RAW/VMDK images (not the AMI)
-    -r "release (e.g 6.0; default to current)"
+```
+usage: obsd-img-builder.sh
+       -a "architecture" -- default to "amd64"
+       -c -- autoconfigure pf(4) and enable IP forwarding
+       -d "description" -- AMI description; defaults to "openbsd-$release-$timestamp"
+       -i "path to RAW image" -- use image at path instead of creating one
+       -m "install mirror" -- defaults to "cdn.openbsd.org"
+       -n -- only create a RAW image (don't convert to an AMI nor push to AWS)
+       -r "release" -- e.g "6.5"; default to "snapshots"
+       -s "image size in GB" -- default to "10"
 ```
 
+## Building sample output
 
-## References
-http://blog.d2-si.fr/2016/02/15/openbsd-on-aws/
-
-
-## Building example
-
-### How to build OpenBSD 6.1 AMI
-
-The example for creating own OpenBSD 6.1 AMI on host with Vagrant and VirtualBox. Using "ftp.fr.openbsd.org" mirror and Amazon AWS Frankfurt (eu-central-1) region.
-
-#### Have OpenBSD 6.1 on your host (with Vagrant and VirtualBox installed)
-
-```shell
-cd /your/work/directory;
-vagrant init SierraX/openbsd-6.1; vagrant up --provider virtualbox;
-vagrant ssh;
+```
+# export AWS_CONFIG_FILE=/home/myuser/.aws/config
+# export AWS_DEFAULT_PROFILE=builder
+# export AWS_SHARED_CREDENTIALS_FILE=/home/myuser/.aws/credentials
 ```
 
-#### When logged in to your OpenBSD virtual machine
-
-```shell
-doas su -;
 ```
-
-Mount wd0k disk with 12GB as /tmp.
-```shell
-umount -f /tmp && mount -o "rw,nodev,nosuid" /dev/wd0k /tmp
-```
-
-Install required packages
-```shell
-pkg_add curl ec2-api-tools awscli vmdktool;
-```
-
-Prepare your environment.
-```shell
-export AWS_ACCESS_KEY_ID=000_YOUR_AWS_ACCESS_KEY_HERE;
-export AWS_SECRET_ACCESS_KEY=000_AWS_SECRET_KEY_HERE;
-export AWS_REGION=eu-central-1;
-export MIRROR=https://ftp.fr.openbsd.org/pub/OpenBSD/
-```
-
-Build and upload your image.
-```shell
-curl -sS -O https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/create-ami.sh;
-ksh create-ami.sh -r "6.1" -d "OpenBSD 6.1 - my AMI";
-```
-
-Launch your newly created AMI, check public IP and login "ssh ec2-user@public_IP". 
-You might want to delete S3 volume and EBS volume used during creating process as well as destroying your vagrant instance.
-
-
-## Script output
-
-```shell
-=========================================================================
-| creating image container
-=========================================================================
-vmctl: imagefile created
-=========================================================================
-| creating and mounting image filesystem
-=========================================================================
+# ./obsd-img-builder.sh      
+================================================================================
+| creating install.site
+================================================================================
+================================================================================
+| creating sd1 and storing siteXX.tgz
+================================================================================
+vmctl: raw imagefile created
 Writing MBR at offset 0.
 Label editor (enter '?' for help at any prompt)
-> > > > > [+|-]new size (with unit): [436448] > offset: [9567904] size: [7209296] FS type: [4.2BSD] mount point: [none] Rounding size to bsize (32 sectors): 7209280
-> Write new label?: [y] /dev/rvnd1a: 131.2MB in 268672 sectors of 512 bytes
-4 cylinder groups of 32.80MB, 2099 blocks, 4224 inodes each
+> offset: [128] size: [2096972] FS type: [4.2BSD] > > No label changes.
+/dev/rvnd0a: 1023.9MB in 2096960 sectors of 512 bytes
+6 cylinder groups of 202.47MB, 12958 blocks, 25984 inodes each
 super-block backups (for fsck -b #) at:
- 32, 67200, 134368, 201536,
-/dev/rvnd1i: 3520.2MB in 7209280 sectors of 512 bytes
-18 cylinder groups of 202.47MB, 12958 blocks, 25984 inodes each
-super-block backups (for fsck -b #) at:
- 32, 414688, 829344, 1244000, 1658656, 2073312, 2487968, 2902624, 3317280, 3731936, 4146592, 4561248, 4975904, 5390560, 5805216, 6219872, 6634528, 7049184,
-newfs: reduced number of fragments per cylinder group from 25840 to 25728 to enlarge last cylinder group
-/dev/rvnd1d: 201.9MB in 413472 sectors of 512 bytes
-5 cylinder groups of 50.25MB, 3216 blocks, 6528 inodes each
-super-block backups (for fsck -b #) at:
- 32, 102944, 205856, 308768, 411680,
-/dev/rvnd1f: 951.2MB in 1948032 sectors of 512 bytes
-5 cylinder groups of 202.47MB, 12958 blocks, 25984 inodes each
-super-block backups (for fsck -b #) at:
- 32, 414688, 829344, 1244000, 1658656,
-newfs: reduced number of fragments per cylinder group from 69464 to 69184 to enlarge last cylinder group
-/dev/rvnd1g: 542.7MB in 1111456 sectors of 512 bytes
-5 cylinder groups of 135.12MB, 8648 blocks, 17408 inodes each
-super-block backups (for fsck -b #) at:
- 32, 276768, 553504, 830240, 1106976,
-/dev/rvnd1h: 2150.4MB in 4404000 sectors of 512 bytes
-11 cylinder groups of 202.47MB, 12958 blocks, 25984 inodes each
-super-block backups (for fsck -b #) at:
- 32, 414688, 829344, 1244000, 1658656, 2073312, 2487968, 2902624, 3317280, 3731936, 4146592,
-/dev/rvnd1e: 512.0MB in 1048576 sectors of 512 bytes
-4 cylinder groups of 128.00MB, 8192 blocks, 16384 inodes each
-super-block backups (for fsck -b #) at:
- 32, 262176, 524320, 786464,
-=========================================================================
-| fetching sets from ftp.fr.openbsd.org/pub/OpenBSD/
-=========================================================================
-bsd          100% |*************************************************************************************************************************************************************************************************************************************************************| 10433 KB    00:12
-bsd.mp       100% |*************************************************************************************************************************************************************************************************************************************************************| 10499 KB    00:12
-bsd.rd       100% |*************************************************************************************************************************************************************************************************************************************************************|  9210 KB    00:10
-base61.tgz   100% |*************************************************************************************************************************************************************************************************************************************************************| 52322 KB    01:02
-comp61.tgz   100% |*************************************************************************************************************************************************************************************************************************************************************| 46070 KB    00:55
-game61.tgz   100% |*************************************************************************************************************************************************************************************************************************************************************|  2707 KB    00:02
-man61.tgz    100% |*************************************************************************************************************************************************************************************************************************************************************|  8719 KB    00:10
-xbase61.tgz  100% |*************************************************************************************************************************************************************************************************************************************************************| 17497 KB    00:20
-xshare61.tgz 100% |*************************************************************************************************************************************************************************************************************************************************************|  4406 KB    00:04
-xfont61.tgz  100% |*************************************************************************************************************************************************************************************************************************************************************| 39342 KB    00:45
-xserv61.tgz  100% |*************************************************************************************************************************************************************************************************************************************************************| 13001 KB    00:15
-=========================================================================
-| fetching ec2-init
-=========================================================================
-ec2-init.sh  100% |*************************************************************************************************************************************************************************************************************************************************************|  3342       00:00
-=========================================================================
-| extracting sets
-=========================================================================
-=========================================================================
-| installing MP kernel
-=========================================================================
-=========================================================================
-| installing ec2-init
-=========================================================================
-=========================================================================
-| creating devices
-=========================================================================
-=========================================================================
-| storing entropy for the initial boot
-=========================================================================
-=========================================================================
-| installing master boot record
-=========================================================================
-=========================================================================
-| configuring the image
-=========================================================================
-=========================================================================
-| unmounting the image
-=========================================================================
-=========================================================================
-| removing downloaded and temporary files
-=========================================================================
-=========================================================================
-| image available at: /tmp/aws-ami.iZa8EwvRnj/openbsd-6.1-amd64-20170512T114247Z
-=========================================================================
-=========================================================================
-| converting image to stream-based VMDK
-=========================================================================
-=========================================================================
-| uploading image to S3 and converting to volume in region eu-central-1
-=========================================================================
-Requesting volume size: 8 GB
-TaskType        IMPORTVOLUME    TaskId  import-vol-fhe7ofgr     ExpirationTime  2017-05-19T11:48:25Z    Status  active  StatusMessage   Pending
-DISKIMAGE       DiskImageFormat VMDK    DiskImageSize   218832384       VolumeSize      8       AvailabilityZone        eu-central-1a   ApproximateBytesConverted       0       Description     openbsd-6.1-amd64-20170512T114247Z
-Creating new manifest at openbsd-6.1-amd64-20170512t114247z/f8025ed1-3c09-4d31-a493-0933aba7a28c/openbsd-6.1-amd64-20170512T114247Z.vmdkmanifest.xml
-Uploading the manifest file
-Uploading 218832384 bytes across 21 parts
-----------------------------------------------------------------------------------------------------
-   Upload progress              Estimated time      Estimated speed
- - 100% [====================>]                     8.574 MBps
-********************* All 218832384 Bytes uploaded in 25s  *********************
-Done uploading.
-Average speed was 8.574 MBps
-The disk image for import-vol-fhe7ofgr has been uploaded to Amazon S3
-where it is being converted into an EBS volume.  You may monitor the
-progress of this task by running ec2-describe-conversion-tasks.  When
-the task is completed, you may use ec2-delete-disk-image to remove the
-image from S3.
+ 32, 414688, 829344, 1244000, 1658656, 2073312,
+================================================================================
+| creating auto_install.conf
+================================================================================
+================================================================================
+| creating modified bsd.rd for autoinstall
+================================================================================
+SHA256.sig   100% |******************************************************|  2141       00:00    
+bsd.rd       100% |******************************************************|  9971 KB    00:01    
+checking signature: /etc/signify/openbsd-65-base.pub
+================================================================================
+| starting autoinstall inside vmm(4)
+================================================================================
+vmctl: raw imagefile created
+Connected to /dev/ttyp5 (speed 115200)
+Copyright (c) 1982, 1986, 1989, 1991, 1993
+	The Regents of the University of California.  All rights reserved.
+Copyright (c) 1995-2019 OpenBSD. All rights reserved.  https://www.OpenBSD.org
 
-=========================================================================
-| creating snapshot in region eu-central-1
-=========================================================================
-SNAPSHOT        snap-010990909c356e639  vol-07f26466f264949e0   pending 2017-05-12T11:50:59+0000                495039774644    8       openbsd-6.1-amd64-20170512T114247Z      Not Encrypted
-=========================================================================
-| registering new AMI in region eu-central-1: openbsd-6.1-amd64-20170512T114247Z
-=========================================================================
-IMAGE   ami-1398417c
+OpenBSD 6.5-beta (RAMDISK_CD) #783: Thu Mar 21 21:42:12 MDT 2019
+    deraadt@amd64.openbsd.org:/usr/src/sys/arch/amd64/compile/RAMDISK_CD
+real mem = 520093696 (496MB)
+avail mem = 500412416 (477MB)
+mainbus0 at root
+bios0 at mainbus0
+acpi at bios0 not configured
+cpu0 at mainbus0: (uniprocessor)
+cpu0: Intel(R) Core(TM) i5-5300U CPU @ 2.30GHz, 2295.72 MHz, 06-3d-04
+cpu0: FPU,VME,DE,PSE,TSC,MSR,PAE,MCE,CX8,SEP,PGE,MCA,CMOV,PAT,PSE36,CFLUSH,MMX,FXSR,SSE,SSE2,SSE3,PCLMUL,SSSE3,FMA3,CX16,SSE4.1,SSE4.2,MOVBE,POPCNT,AES,XSAVE,AVX,F16C,RDRAND,HV,NXE,PAGE1GB,LONG,LAHF,ABM,3DNOWP,ITSC,FSGSBASE,BMI1,AVX2,SMEP,BMI2,ERMS,RDSEED,ADX,SMAP,MELTDOWN
+cpu0: 256KB 64b/line 8-way L2 cache
+pvbus0 at mainbus0: OpenBSD
+pci0 at mainbus0 bus 0
+pchb0 at pci0 dev 0 function 0 "OpenBSD VMM Host" rev 0x00
+virtio0 at pci0 dev 1 function 0 "Qumranet Virtio RNG" rev 0x00
+viornd0 at virtio0
+virtio0: irq 3
+virtio1 at pci0 dev 2 function 0 "Qumranet Virtio Network" rev 0x00
+vio0 at virtio1: address fe:e1:bb:d1:44:83
+virtio1: irq 5
+virtio2 at pci0 dev 3 function 0 "Qumranet Virtio Storage" rev 0x00
+vioblk0 at virtio2
+scsibus0 at vioblk0: 2 targets
+sd0 at scsibus0 targ 0 lun 0: <VirtIO, Block Device, > SCSI3 0/direct fixed
+sd0: 12288MB, 512 bytes/sector, 25165824 sectors
+virtio2: irq 6
+virtio3 at pci0 dev 4 function 0 "Qumranet Virtio Storage" rev 0x00
+vioblk1 at virtio3
+scsibus1 at vioblk1: 2 targets
+sd1 at scsibus1 targ 0 lun 0: <VirtIO, Block Device, > SCSI3 0/direct fixed
+sd1: 1024MB, 512 bytes/sector, 2097152 sectors
+virtio3: irq 7
+virtio4 at pci0 dev 5 function 0 "OpenBSD VMM Control" rev 0x00
+vmmci0 at virtio4
+virtio4: irq 9
+isa0 at mainbus0
+com0 at isa0 port 0x3f8/8 irq 4: ns16450, no fifo
+com0: console
+softraid0 at root
+scsibus2 at softraid0: 256 targets
+root on rd0a swap on rd0b dump on rd0b
+erase ^?, werase ^W, kill ^U, intr ^C, status ^T
+
+Welcome to the OpenBSD/amd64 6.5 installation program.
+Starting non-interactive mode in 5 seconds...
+(I)nstall, (U)pgrade, (A)utoinstall or (S)hell? waiting for vm openbsd-current-amd64-20190322T091544Z: 
+Performing non-interactive install...
+Terminal type? [vt220] vt220
+System hostname? (short form, e.g. 'foo') openbsd
+
+Available network interfaces are: vio0 vlan0.
+Which network interface do you wish to configure? (or 'done') [vio0] vio0
+IPv4 address for vio0? (or 'dhcp' or 'none') [dhcp] dhcp
+IPv6 address for vio0? (or 'autoconf' or 'none') [none] none
+Available network interfaces are: vio0 vlan0.
+Which network interface do you wish to configure? (or 'done') [done] done
+DNS domain name? (e.g. 'example.com') [my.domain] my.domain
+Using DNS nameservers at 100.64.11.2
+
+Password for root account? <provided>
+Public ssh key for root account? [none] none
+Start sshd(8) by default? [yes] yes
+Change the default console to com0? [yes] yes
+Available speeds are: 9600 19200 38400 57600 115200.
+Which speed should com0 use? (or 'done') [115200] 115200
+Setup a user? (enter a lower-case loginname, or 'no') [no] ec2-user
+Full name for user ec2-user? [ec2-user] EC2 Default User
+Password for user ec2-user? <provided>
+Public ssh key for user ec2-user [none] none
+WARNING: root is targeted by password guessing attacks, pubkeys are safer.
+Allow root ssh login? (yes, no, prohibit-password) [no] no
+What timezone are you in? ('?' for list) [UTC] UTC
+
+Available disks are: sd0 sd1.
+Which disk is the root disk? ('?' for details) [sd0] sd0
+No valid MBR or GPT.
+Use (W)hole disk MBR, whole disk (G)PT or (E)dit? [whole] whole
+Setting OpenBSD MBR partition to whole sd0...done.
+URL to autopartitioning template for disklabel? [none] none
+The auto-allocated layout for sd0 is:
+#                size           offset  fstype [fsize bsize   cpg]
+  a:           255.1M               64  4.2BSD   2048 16384     1 # /
+  b:           290.2M           522496    swap                    
+  c:         12288.0M                0  unused                    
+  d:           288.2M          1116832  4.2BSD   2048 16384     1 # /tmp
+  e:           353.2M          1706976  4.2BSD   2048 16384     1 # /var
+  f:          1005.1M          2430432  4.2BSD   2048 16384     1 # /usr
+  g:           447.0M          4488864  4.2BSD   2048 16384     1 # /usr/X11R6
+  h:          1339.3M          5404416  4.2BSD   2048 16384     1 # /usr/local
+  i:          1342.0M          8147296  4.2BSD   2048 16384     1 # /usr/src
+  j:          5204.1M         10895776  4.2BSD   2048 16384     1 # /usr/obj
+  k:          1759.8M         21553728  4.2BSD   2048 16384     1 # /home
+Use (A)uto layout, (E)dit auto layout, or create (C)ustom layout? [a] a
+newfs: reduced number of fragments per cylinder group from 32648 to 32512 to enlarge last cylinder group
+/dev/rsd0a: 255.1MB in 522432 sectors of 512 bytes
+5 cylinder groups of 63.50MB, 4064 blocks, 8192 inodes each
+/dev/rsd0k: 1759.8MB in 3604032 sectors of 512 bytes
+9 cylinder groups of 202.47MB, 12958 blocks, 25984 inodes each
+newfs: reduced number of fragments per cylinder group from 36880 to 36728 to enlarge last cylinder group
+/dev/rsd0d: 288.2MB in 590144 sectors of 512 bytes
+5 cylinder groups of 71.73MB, 4591 blocks, 9216 inodes each
+/dev/rsd0f: 1005.1MB in 2058432 sectors of 512 bytes
+5 cylinder groups of 202.47MB, 12958 blocks, 25984 inodes each
+newfs: reduced number of fragments per cylinder group from 57216 to 56992 to enlarge last cylinder group
+/dev/rsd0g: 447.0MB in 915552 sectors of 512 bytes
+5 cylinder groups of 111.31MB, 7124 blocks, 14336 inodes each
+/dev/rsd0h: 1339.3MB in 2742880 sectors of 512 bytes
+7 cylinder groups of 202.47MB, 12958 blocks, 25984 inodes each
+/dev/rsd0j: 5204.1MB in 10657952 sectors of 512 bytes
+26 cylinder groups of 202.47MB, 12958 blocks, 25984 inodes each
+/dev/rsd0i: 1342.0MB in 2748480 sectors of 512 bytes
+7 cylinder groups of 202.47MB, 12958 blocks, 25984 inodes each
+/dev/rsd0e: 353.2MB in 723456 sectors of 512 bytes
+4 cylinder groups of 88.31MB, 5652 blocks, 11392 inodes each
+Available disks are: sd1.
+Which disk do you wish to initialize? (or 'done') [done] done
+/dev/sd0a (9861f4b2a79df4f4.a) on /mnt type ffs (rw, asynchronous, local)
+/dev/sd0k (9861f4b2a79df4f4.k) on /mnt/home type ffs (rw, asynchronous, local, nodev, nosuid)
+/dev/sd0d (9861f4b2a79df4f4.d) on /mnt/tmp type ffs (rw, asynchronous, local, nodev, nosuid)
+/dev/sd0f (9861f4b2a79df4f4.f) on /mnt/usr type ffs (rw, asynchronous, local, nodev)
+/dev/sd0g (9861f4b2a79df4f4.g) on /mnt/usr/X11R6 type ffs (rw, asynchronous, local, nodev)
+/dev/sd0h (9861f4b2a79df4f4.h) on /mnt/usr/local type ffs (rw, asynchronous, local, nodev)
+/dev/sd0j (9861f4b2a79df4f4.j) on /mnt/usr/obj type ffs (rw, asynchronous, local, nodev, nosuid)
+/dev/sd0i (9861f4b2a79df4f4.i) on /mnt/usr/src type ffs (rw, asynchronous, local, nodev, nosuid)
+/dev/sd0e (9861f4b2a79df4f4.e) on /mnt/var type ffs (rw, asynchronous, local, nodev, nosuid)
+
+Let's install the sets!
+Location of sets? (disk http or 'done') [disk] http
+HTTP proxy URL? (e.g. 'http://proxy:8080', or 'none') [none] none
+HTTP Server? (hostname, list#, 'done' or '?') [cdn.openbsd.org] cdn.openbsd.org
+Server directory? [pub/OpenBSD/snapshots/amd64] pub/OpenBSD/snapshots/amd64
+
+Select sets by entering a set name, a file name pattern or 'all'. De-select
+sets by prepending a '-', e.g.: '-game*'. Selected sets are labelled '[X]'.
+    [X] bsd           [X] comp65.tgz    [X] xbase65.tgz   [X] xserv65.tgz
+    [X] bsd.rd        [X] man65.tgz     [X] xshare65.tgz
+    [X] base65.tgz    [X] game65.tgz    [X] xfont65.tgz
+Set name(s)? (or 'abort' or 'done') [done] done
+Get/Verify SHA256.sig   100% |**************************|  2141       00:00    
+Signature Verified
+Get/Verify bsd          100% |**************************| 15492 KB    00:02    
+Get/Verify bsd.rd       100% |**************************|  9971 KB    00:01    
+Get/Verify base65.tgz   100% |**************************|   191 MB    00:27    
+Get/Verify comp65.tgz   100% |**************************| 93001 KB    00:12    
+Get/Verify man65.tgz    100% |**************************|  7383 KB    00:01    
+Get/Verify game65.tgz   100% |**************************|  2740 KB    00:00    
+Get/Verify xbase65.tgz  100% |**************************| 20664 KB    00:03    
+Get/Verify xshare65.tgz 100% |**************************|  4448 KB    00:01    
+Get/Verify xfont65.tgz  100% |**************************| 39342 KB    00:05    
+Get/Verify xserv65.tgz  100% |**************************| 16684 KB    00:02    
+Installing bsd          100% |**************************| 15492 KB    00:00    
+Installing bsd.rd       100% |**************************|  9971 KB    00:00    
+Installing base65.tgz   100% |**************************|   191 MB    00:18    
+Extracting etc.tgz      100% |**************************|   256 KB    00:00    
+Installing comp65.tgz   100% |**************************| 93001 KB    00:14    
+Installing man65.tgz    100% |**************************|  7383 KB    00:01    
+Installing game65.tgz   100% |**************************|  2740 KB    00:00    
+Installing xbase65.tgz  100% |**************************| 20664 KB    00:02    
+Extracting xetc.tgz     100% |**************************|  6935       00:00    
+Installing xshare65.tgz 100% |**************************|  4448 KB    00:01    
+Installing xfont65.tgz  100% |**************************| 39342 KB    00:03    
+Installing xserv65.tgz  100% |**************************| 16684 KB    00:01    
+Location of sets? (disk http or 'done') [done] disk
+Is the disk partition already mounted? [yes] no
+Available disks are: sd0 sd1.
+Which disk contains the install media? (or 'done') [sd1] sd1
+Pathname to the sets? (or 'done') [6.5/amd64] 6.5/amd64
+INSTALL.amd64 not found. Use sets found here anyway? [no] yes
+
+Select sets by entering a set name, a file name pattern or 'all'. De-select
+sets by prepending a '-', e.g.: '-game*'. Selected sets are labelled '[X]'.
+    [ ] site65.tgz
+Set name(s)? (or 'abort' or 'done') [done] site*
+    [X] site65.tgz
+Set name(s)? (or 'abort' or 'done') [done] done
+Directory does not contain SHA256.sig. Continue without verification? [no] yes
+Installing site65.tgz   100% |**************************|   372       00:00    
+Location of sets? (disk http or 'done') [done] done
+Saving configuration files... done.
+Making all device nodes... done.
+Relinking to create unique kernel... done.
+
+CONGRATULATIONS! Your OpenBSD install has been successfully completed!
+
+When you login to your new system the first time, please read your mail
+using the 'mail' command.
+
+syncing disks... done
+vmmci0: powerdown
+rebooting...
+terminated vm 11
+                stopping vm openbsd-current-amd64-20190322T091544Z: forced to terminate vm 11
+
+[SIGTERM]
+================================================================================
+| creating IAM role
+================================================================================
+{
+    "Role": {
+        "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17", 
+            "Statement": [
+                {
+                    "Action": "sts:AssumeRole", 
+                    "Effect": "Allow", 
+                    "Condition": {
+                        "StringEquals": {
+                            "sts:Externalid": "vmimport"
+                        }
+                    }, 
+                    "Principal": {
+                        "Service": "vmie.amazonaws.com"
+                    }
+                }
+            ]
+        }, 
+        "RoleId": "AROAJ724UC5U3JGJ5EZ7C", 
+        "CreateDate": "2019-03-22T09:18:45Z", 
+        "RoleName": "openbsd-current-amd64-20190322T091544Z", 
+        "Path": "/", 
+        "Arn": "arn:aws:iam::360116137065:role/openbsd-current-amd64-20190322T091544Z"
+    }
+}
+================================================================================
+| converting image to stream-based VMDK
+================================================================================
+================================================================================
+| uploading image to S3
+================================================================================
+{
+    "Location": "http://openbsd-current-amd64-20190322t091544z-29476.s3.amazonaws.com/"
+}
+upload: ./openbsd-current-amd64-20190322T091544Z.vmdk to s3://openbsd-current-amd64-20190322t091544z-29476/openbsd-current-amd64-20190322T091544Z.vmdk
+================================================================================
+| converting VMDK to snapshot
+================================================================================
+ Progress: None%
+================================================================================
+| removing bucket openbsd-current-amd64-20190322t091544z-29476
+================================================================================
+delete: s3://openbsd-current-amd64-20190322t091544z-29476/openbsd-current-amd64-20190322T091544Z.vmdk
+remove_bucket: openbsd-current-amd64-20190322t091544z-29476
+================================================================================
+| registering AMI
+================================================================================
+{
+    "ImageId": "ami-0d1cf7bb6f969621f"
+}
+================================================================================
+| removing IAM role
+================================================================================
+================================================================================
+| work directory: /tmp/aws-ami.p0MJZxjBcr
+================================================================================
+```
+
+Instanciate the AMI and connect to it using SSH:
+
+```
+$ ssh ec2-user@${IPADDR}
 ```
