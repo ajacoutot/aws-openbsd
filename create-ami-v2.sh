@@ -15,6 +15,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 # TODO: arm64 support
+# TODO: MP support
 
 set -e
 umask 022
