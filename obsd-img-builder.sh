@@ -433,7 +433,6 @@ fi
 if ${CREATE_AMI}; then
 	[[ ${ARCH} == i386 ]] &&
 		pr_err "${ARCH} lacks xen(4) support to run on AWS"
-	readonly AWS_DEFAULT_PROFILE=${AWS_DEFAULT_PROFILE:-default}
 	type aws >/dev/null 2>&1 || pr_err "package \"awscli\" is not installed"
 	type vmdktool >/dev/null 2>&1 ||
 		pr_err "package \"vmdktool\" is not installed"
