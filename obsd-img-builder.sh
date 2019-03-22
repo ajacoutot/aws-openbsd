@@ -20,9 +20,7 @@ umask 022
 create_ami() {
 	local _arch=${ARCH} _importsnapid _snap
 
-	if [[ ${_arch} == amd64 ]]; then
-		_arch=x86_64
-	fi
+	! [[ ${_arch} == amd64 ]] || _arch=x86_64
 
 	pr_title "converting image to stream-based VMDK"
 	vmdktool -v ${IMGPATH}.vmdk ${IMGPATH}
@@ -224,6 +222,7 @@ create_install_site()
 create_install_site_disk()
 {
 	# XXX trap vnd and mount
+
 	local _lrel _rel _rrel
 	local _siteimg=${_WRKDIR}/siteXX.img _sitemnt=${_WRKDIR}/siteXX
 	local _vndev="$(vnconfig -l | grep 'not in use' | head -1 |
@@ -290,7 +289,7 @@ pr_title()
 
 setup_forwarding()
 {
-	! ${NETCONF} && return 0
+	${NETCONF} || return 0
 
 	if [[ $(sysctl -n net.inet.ip.forwarding) != 1 ]]; then
 		pr_title "enabling paquet forwarding"
@@ -301,7 +300,7 @@ setup_forwarding()
 
 setup_pf()
 {
-	! ${NETCONF} && return 0
+	${NETCONF} || return 0
 
 	local _pfrules
 
