@@ -188,13 +188,14 @@ create_img()
 
 	vmctl create ${IMGPATH} -s ${IMGSIZE}G
 
-	(sleep 30 && vmctl wait ${_IMGNAME} && vmctl stop ${_IMGNAME} -f) &
+	# handle EOT
+	(sleep 10 && vmctl wait ${_IMGNAME} && _tty=$(get_tty ${_IMGNAME}) &&
+		vmctl stop ${_IMGNAME} -f && pkill -f "/usr/bin/cu -l ${_tty}")&
 
-	vmctl start ${_IMGNAME} -b ${_WRKDIR}/bsd.rd -c -L -d ${IMGPATH} -d \
-		${_WRKDIR}/siteXX.img
 	# XXX handle installation error
 	# (e.g. ftp: raw.githubusercontent.com: no address associated with name)
-	# XXX handle EOT
+	vmctl start ${_IMGNAME} -b ${_WRKDIR}/bsd.rd -c -L -d ${IMGPATH} -d \
+		${_WRKDIR}/siteXX.img
 }
 
 create_install_site()
@@ -266,6 +267,16 @@ create_install_site_disk()
 
 	umount ${_sitemnt}
 	vnconfig -u ${_vndev}
+}
+
+get_tty()
+{
+	local _tty _vmname=$1
+	[[ -n ${_vmname} ]]
+
+	vmctl status | grep "${_vmname}" | while read -r _ _ _ _ _ _tty _ _; do
+		echo /dev/${_tty}
+	done
 }
 
 pr_err()
