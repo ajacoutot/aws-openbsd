@@ -29,6 +29,11 @@ usage: obsd-img-builder.sh
        -s "image size in GB" -- default to "10"
 ```
 
+## TODO
+
+* arm64 support
+* MP support
+
 ## Building sample output
 
 ```
