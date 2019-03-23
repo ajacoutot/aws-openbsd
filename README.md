@@ -35,6 +35,22 @@ usage: obsd-img-builder.sh
 * arm64 support
 * MP support
 
+## ENI hotplug
+
+```
+# cat <<-'EOF' >/etc/hotplug/attach
+#!/bin/sh
+
+case $1 in
+	3)      echo "!/sbin/dhclient -i routers $2" >/etc/hostname.$2
+		/bin/sh /etc/netstart $i
+		;;
+esac
+EOF
+# chmod 0555 /etc/hotplug/attach
+# rcctl enable hotplugd && rcctl start hotplugd
+```
+
 ## Building sample output
 
 ```
