@@ -35,7 +35,16 @@ usage: obsd-img-builder.sh
 * arm64 support
 * MP support
 
-## ENI hotplug
+### Misc
+
+### KARL (kernel address randomized link)
+
+While a newly built image/AMI will contain a randomized kernel, it is advised
+to add user-data at first boot that will reboot the instance once the first
+randomization is done. This is so that every instance will indeed run a
+different relinked kernel.
+
+### ENI hotplug
 
 ```
 # cat <<-'EOF' >/etc/hotplug/attach
@@ -51,7 +60,7 @@ EOF
 # rcctl enable hotplugd && rcctl start hotplugd
 ```
 
-## Building sample output
+### Build sample output
 
 ```
 # export AWS_CONFIG_FILE=/home/myuser/.aws/config
