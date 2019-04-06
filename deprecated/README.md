@@ -1,3 +1,5 @@
+# DEPRECATED, use at your own risk
+
 # create-ami.
 
 ## Prerequisites
