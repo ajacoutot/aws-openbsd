@@ -9,7 +9,7 @@ Running whatever is in this repo will propably end up destroying a kitten factor
 * shell access to OpenBSD current >6.5 with vmm(4) support and Internet access
   * working vmm(4) internet access using local network interface (or use the "-c" option)
 * 3GB of free space in ${TMPDIR}
-* *awscli*, *upobsd* and *vmdktool* packages installed
+* *awscli* and *vmdktool* packages installed
 * AWS IAM user with enough permissions (AmazonEC2FullAccess, AmazonS3FullAccess, IAMFullAccess)
   * AWS environment variables properly set (when not use root's awscli configuration):
     * *AWS_CONFIG_FILE*

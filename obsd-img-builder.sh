@@ -177,13 +177,23 @@ create_iam_role()
 
 create_img()
 {
+	local _bsdrd=${_WRKDIR}/bsd.rd _rdextract=${_WRKDIR}/bsd.rd.extract
+	local _rdmnt=${_WRKDIR}/rdmnt _vndev
+
 	create_install_site_disk
 
 	create_autoinstallconf
 
 	pr_title "creating modified bsd.rd for autoinstall"
-	upobsd -V ${RELEASE} -a ${ARCH} -i ${_WRKDIR}/auto_install.conf \
-		-o ${_WRKDIR}/bsd.rd
+	ftp -MV -o ${_bsdrd} ${MIRROR}/${RELEASE}/${ARCH}/bsd.rd
+	rdsetroot -x ${_bsdrd} ${_rdextract}
+	_vndev=$(vnconfig -A ${_rdextract})
+	install -d ${_rdmnt}
+	mount /dev/${_vndev}a ${_rdmnt}
+	cp ${_WRKDIR}/auto_install.conf ${_rdmnt}
+	umount ${_rdmnt}
+	vnconfig -u ${_vndev}
+	rdsetroot ${_bsdrd} ${_rdextract}
 
 	pr_title "starting autoinstall inside vmm(4)"
 
@@ -432,8 +442,6 @@ if [[ ! -f ${IMGPATH} ]]; then
 	grep -q ^vmm0 /var/run/dmesg.boot || pr_err "need vmm(4) support"
 	[[ ${_IMGNAME}} != [[:alpha:]]* ]] &&
 		pr_err "image name must start with a letter"
-	type upobsd >/dev/null 2>&1 ||
-		pr_err "package \"upobsd\" is not installed"
 fi
 
 # requirements checks to build and register the AMI
