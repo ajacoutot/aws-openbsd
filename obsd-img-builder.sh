@@ -74,6 +74,10 @@ create_ami() {
 create_autoinstallconf()
 {
 	local _autoinstallconf=${_WRKDIR}/auto_install.conf
+	local _mirror=${MIRROR}
+
+	_mirror=${_mirror#*://}
+	_mirror=${_mirror%%/*}
 
 	pr_title "creating auto_install.conf"
 
@@ -86,7 +90,8 @@ create_autoinstallconf()
 	Password for user = *************
 	What timezone are you in = UTC
 	Location of sets = http
-	HTTP Server = ${MIRROR}
+	HTTP Server = ${_mirror}
+	Unable to connect using https = yes
 	Server directory = pub/OpenBSD/${RELEASE}/${ARCH}
 	Set name(s) = done
 	EOF
@@ -362,7 +367,7 @@ usage()
        -c -- autoconfigure pf(4) and enable IP forwarding
        -d \"description\" -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
        -i \"path to RAW image\" -- use image at path instead of creating one
-       -m \"install mirror\" -- defaults to \"cdn.openbsd.org\"
+       -m \"install mirror\" -- defaults to installurl(5) or \"https://cdn.openbsd.org/pub/OpenBSD\"
        -n -- only create a RAW image (don't convert to an AMI nor push to AWS)
        -r \"release\" -- e.g \"6.5\"; default to \"snapshots\"
        -s \"image size in GB\" -- default to \"10\""
@@ -399,9 +404,16 @@ fi
 ARCH=${ARCH:-amd64}
 CREATE_AMI=${CREATE_AMI:-true}
 IMGSIZE=${IMGSIZE:-10}
-MIRROR=${MIRROR:-cdn.openbsd.org}
 NETCONF=${NETCONF:-false}
 RELEASE=${RELEASE:-snapshots}
+
+if [[ -z ${MIRROR} ]]; then
+	MIRROR=$(while read _line; do _line=${_line%%#*}; [[ -n ${_line} ]] &&
+		print -r -- "${_line}"; done </etc/installurl | tail -1) \
+		2>/dev/null
+	[[ ${MIRROR} == @(http|https)://* ]] ||
+		MIRROR="https://cdn.openbsd.org/pub/OpenBSD"
+fi
 
 _IMGNAME=openbsd-${RELEASE}-${ARCH}-${_TS}
 [[ ${RELEASE} == snapshots ]] &&
