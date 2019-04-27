@@ -223,10 +223,8 @@ create_install_site_disk()
 {
 	# XXX trap vnd and mount
 
-	local _lrel _rel _rrel
+	local _lrel _rel _rrel _vndev
 	local _siteimg=${_WRKDIR}/siteXX.img _sitemnt=${_WRKDIR}/siteXX
-	local _vndev="$(vnconfig -l | grep 'not in use' | head -1 |
-		cut -d ':' -f1)"
 
 	[[ ${RELEASE} == snapshots ]] && _rel=$(uname -r) || _rel=${RELEASE}
 
@@ -234,10 +232,8 @@ create_install_site_disk()
 
 	pr_title "creating sd1 and storing siteXX.tgz"
 
-	[[ -z ${_vndev} ]] && pr_err "no vnd(4) device available"
-
 	vmctl create ${_siteimg} -s 1G
-	vnconfig ${_vndev} ${_siteimg}
+	_vndev="$(vnconfig -A ${_siteimg})"
 	fdisk -iy ${_vndev}
 	echo "a a\n\n\n\nw\nq\n" | disklabel -E ${_vndev}
 	newfs ${_vndev}a
