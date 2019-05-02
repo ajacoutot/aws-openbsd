@@ -187,8 +187,12 @@ create_img()
 	pr_title "creating modified bsd.rd for autoinstall"
 	ftp -MV -o ${_bsdrd} ${MIRROR}/${RELEASE}/${ARCH}/bsd.rd
 	rdsetroot -x ${_bsdrd} ${_rdextract}
-	_vndev=$(vnconfig ${_rdextract})
-	install -d ${_rdmnt}
+
+  _vndev="$(vnconfig -l | grep 'not in use' | head -1 | cut -d: -f1)"
+	#_vndev=$(vnconfig ${_rdextract})
+	vnconfig "${_vndev}" "${_rdextract}"
+
+  install -d ${_rdmnt}
 	mount /dev/${_vndev}a ${_rdmnt}
 	cp ${_WRKDIR}/auto_install.conf ${_rdmnt}
 	umount ${_rdmnt}
@@ -247,9 +251,16 @@ create_install_site_disk()
 
 	pr_title "creating sd1 and storing siteXX.tgz"
 
+ 
 	vmctl create ${_siteimg} -s 1G
-	_vndev="$(vnconfig ${_siteimg})"
-	fdisk -iy ${_vndev}
+
+
+#  _vndev="$(vnconfig ${_siteimg})"
+
+  _vndev="$(vnconfig -l | grep 'not in use' | head -1 | cut -d: -f1)"
+  vnconfig "${_vndev}" "${_siteimg}"
+
+  fdisk -iy ${_vndev}
 	echo "a a\n\n\n\nw\nq\n" | disklabel -E ${_vndev}
 	newfs ${_vndev}a
 
