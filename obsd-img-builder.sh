@@ -282,7 +282,7 @@ get_tty()
 	local _tty _vmname=$1
 	[[ -n ${_vmname} ]]
 
-	vmctl status | grep "${_vmname}" | while read -r _ _ _ _ _ _tty _ _; do
+	vmctl status | grep "${_vmname}" | while read -r _ _ _ _ _ _tty _; do
 		echo /dev/${_tty}
 	done
 }
