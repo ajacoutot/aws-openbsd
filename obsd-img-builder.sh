@@ -197,16 +197,16 @@ create_img()
 
 	pr_title "starting autoinstall inside vmm(4)"
 
-	vmctl create ${IMGPATH} -s ${IMGSIZE}G
+	vmctl create -s ${IMGSIZE}G ${IMGPATH}
 
 	# handle cu(1) EOT
 	(sleep 10 && vmctl wait ${_IMGNAME} && _tty=$(get_tty ${_IMGNAME}) &&
-		vmctl stop ${_IMGNAME} -f && pkill -f "/usr/bin/cu -l ${_tty}")&
+		vmctl stop -f ${_IMGNAME} && pkill -f "/usr/bin/cu -l ${_tty}")&
 
 	# XXX handle installation error
 	# (e.g. ftp: raw.githubusercontent.com: no address associated with name)
-	vmctl start ${_IMGNAME} -b ${_WRKDIR}/bsd.rd -c -L -d ${IMGPATH} -d \
-		${_WRKDIR}/siteXX.img
+	vmctl start -b ${_WRKDIR}/bsd.rd -c -L -d ${IMGPATH} -d \
+		${_WRKDIR}/siteXX.img ${_IMGNAME}
 }
 
 create_install_site()
@@ -247,7 +247,7 @@ create_install_site_disk()
 
 	pr_title "creating sd1 and storing siteXX.tgz"
 
-	vmctl create ${_siteimg} -s 1G
+	vmctl create -s 1G ${_siteimg}
 	_vndev="$(vnconfig ${_siteimg})"
 	fdisk -iy ${_vndev}
 	echo "a a\n\n\n\nw\nq\n" | disklabel -E ${_vndev}
