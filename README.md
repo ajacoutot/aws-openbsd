@@ -1,13 +1,11 @@
 # AWS-OpenBSD
 
-AWS playground for OpenBSD kids.
-
+AWS playground for OpenBSD kids.  
 Running whatever is in this repo will propably end up destroying a kitten factory.
 
 ## Prerequisites for obsd-img-builder.sh (OpenBSD AMI builder)
 
 * shell access to OpenBSD current >6.5 with vmm(4) support and Internet access
-  * working vmm(4) internet access using local network interface (or use the "-c" option)
 * 3GB of free space in ${TMPDIR}
 * *awscli* and *vmdktool* packages installed
 * AWS IAM user with enough permissions (AmazonEC2FullAccess, AmazonS3FullAccess, IAMFullAccess)
@@ -21,13 +19,12 @@ Running whatever is in this repo will propably end up destroying a kitten factor
 ```
 usage: obsd-img-builder.sh
        -a "architecture" -- default to "amd64"
-       -c -- autoconfigure pf(4) and enable IP forwarding
        -d "description" -- AMI description; defaults to "openbsd-$release-$timestamp"
        -i "path to RAW image" -- use image at path instead of creating one
-       -m "install mirror" -- defaults to "cdn.openbsd.org"
+       -m "install mirror" -- defaults to installurl(5) or "https://cdn.openbsd.org/pub/OpenBSD"
        -n -- only create a RAW image (don't convert to an AMI nor push to AWS)
        -r "release" -- e.g "6.5"; default to "snapshots"
-       -s "image size in GB" -- default to "10"
+       -s "image size in GB" -- default to "12"
 ```
 
 ## TODO
