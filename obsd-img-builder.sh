@@ -89,10 +89,7 @@ create_autoinstallconf()
 	Full name for user ec2-user = EC2 Default User
 	Password for user = *************
 	What timezone are you in = UTC
-	Location of sets = http
-	HTTP Server = ${_mirror}
-	Unable to connect using https = yes
-	Server directory = pub/OpenBSD/${RELEASE}/${ARCH}
+	Location of sets = cd
 	Set name(s) = done
 	EOF
 
@@ -206,7 +203,7 @@ create_img()
 	# XXX handle installation error
 	# (e.g. ftp: raw.githubusercontent.com: no address associated with name)
 	vmctl start -b ${_WRKDIR}/bsd.rd -c -L -d ${IMGPATH} -d \
-		${_WRKDIR}/siteXX.img ${_IMGNAME}
+		${_WRKDIR}/siteXX.img -r ${_WRKDIR}/installXX.iso ${_IMGNAME}
 }
 
 create_install_site()
@@ -216,8 +213,6 @@ create_install_site()
 	pr_title "creating install.site"
 
 	cat <<-'EOF' >>${_WRKDIR}/install.site
-	ftp -V -o /usr/local/libexec/ec2-init \
-		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
 	chown root:bin /usr/local/libexec/ec2-init
 	chmod 0555 /usr/local/libexec/ec2-init
 
@@ -238,14 +233,15 @@ create_install_site_disk()
 {
 	# XXX trap vnd and mount
 
-	local _lrel _rel _rrel _vndev
+	local _rel _relint _retrydl=true _vndev
 	local _siteimg=${_WRKDIR}/siteXX.img _sitemnt=${_WRKDIR}/siteXX
 
 	[[ ${RELEASE} == snapshots ]] && _rel=$(uname -r) || _rel=${RELEASE}
+	_relint=${_rel%.*}${_rel#*.}
 
 	create_install_site
 
-	pr_title "creating sd1 and storing siteXX.tgz"
+	pr_title "creating install_site disk"
 
 	vmctl create -s 1G ${_siteimg}
 	_vndev="$(vnconfig ${_siteimg})"
@@ -257,21 +253,25 @@ create_install_site_disk()
 	mount /dev/${_vndev}a ${_sitemnt}
 	install -d ${_sitemnt}/${_rel}/${ARCH}
 
-	# in case we're running an X.Y snapshot while X.Z is out;
-	# (e.g. running on 6.4-current and installing 6.5-beta)
-	_lrel=${_rel%.*}
-	_rrel=${_rel#*.}
-	if [[ ${_rrel} == 9 ]]; then
-		# e.g. ln 5.9 6.0
-		(cd ${_sitemnt} && ln -s ${_rel} $((_lrel+1)).0)
-	else
-		# e.g. ln 5.8 5.9
-		(cd ${_sitemnt} && ln -s ${_rel} ${_lrel}.$((_rrel+1)))
-	fi
+	pr_title "downloading installation ISO"
+	while ! ftp -o ${_WRKDIR}/installXX.iso \
+		${MIRROR}/${RELEASE}/${ARCH}/install${_relint}.iso; do
+		# in case we're running an X.Y snapshot while X.Z is out;
+		# (e.g. running on 6.4-current and installing 6.5-beta)
+		${_retrydl} || pr_err "cannot download installation ISO"
+		_relint=$((_relint+1))
+		_retrydl=false
+	done
 
+	pr_title "downloading ec2-init"
+	install -d ${_WRKDIR}/usr/local/libexec/
+	ftp -o ${_WRKDIR}/usr/local/libexec/ec2-init \
+		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
+
+	pr_title "storing siteXX.tgz into install_site disk"
 	cd ${_WRKDIR} && tar czf \
-		${_sitemnt}/${_rel}/${ARCH}/site${_rel%.[0-9]}${_rel#[0-9].}.tgz \
-			./install.site
+		${_sitemnt}/${_rel}/${ARCH}/site${_relint}.tgz ./install.site \
+			./usr/local/libexec/ec2-init
 
 	umount ${_sitemnt}
 	vnconfig -u ${_vndev}
@@ -298,33 +298,6 @@ pr_title()
 	echo "${_line}\n| ${@}\n${_line}"
 }
 
-setup_forwarding()
-{
-	${NETCONF} || return 0
-
-	if [[ $(sysctl -n net.inet.ip.forwarding) != 1 ]]; then
-		pr_title "enabling paquet forwarding"
-		_RESET_FWD=true
-		sysctl -q net.inet.ip.forwarding=1
-	fi
-}
-
-setup_pf()
-{
-	${NETCONF} || return 0
-
-	local _pfrules
-
-	pr_title "setting up pf(4) rules"
-
-	if ! $(pfctl -e >/dev/null); then
-		_RESET_PF=true
-	fi
-	print -- "pass out on egress from 100.64.0.0/10 to any nat-to (egress)
-		  pass in proto { tcp, udp } from 100.64.0.0/10 to any port domain rdr-to 1.1.1.1" |
-		pfctl -f -
-}
-
 setup_vmd()
 {
 	if ! $(rcctl check vmd >/dev/null); then
@@ -345,20 +318,6 @@ trap_handler()
 		aws iam delete-role --role-name ${_IMGNAME} 2>/dev/null
 	fi
 
-	if ${_RESET_FWD:-false}; then
-		pr_title "disabling paquet forwarding"
-		sysctl -q net.inet.ip.forwarding=0
-	fi
-
-	if ${_RESET_PF:-false}; then
-		pr_title "disabling pf(4)"
-		pfctl -d >/dev/null
-		pfctl -F rules >/dev/null
-	elif ${NETCONF}; then
-		pr_title "restoring pf(4) rules"
-		pfctl -f /etc/pf.conf
-	fi
-
 	if ${_RESET_VMD:-false}; then
 		pr_title "stopping vmd(8)"
 		rcctl stop vmd >/dev/null
@@ -374,21 +333,19 @@ usage()
 {
 	echo "usage: ${0##*/}
        -a \"architecture\" -- default to \"amd64\"
-       -c -- autoconfigure pf(4) and enable IP forwarding
        -d \"description\" -- AMI description; defaults to \"openbsd-\$release-\$timestamp\"
        -i \"path to RAW image\" -- use image at path instead of creating one
        -m \"install mirror\" -- defaults to installurl(5) or \"https://cdn.openbsd.org/pub/OpenBSD\"
        -n -- only create a RAW image (don't convert to an AMI nor push to AWS)
        -r \"release\" -- e.g \"6.5\"; default to \"snapshots\"
-       -s \"image size in GB\" -- default to \"10\""
+       -s \"image size in GB\" -- default to \"12\""
 
 	return 1
 }
 
-while getopts a:cd:i:m:nr:s: arg; do
+while getopts a:d:i:m:nr:s: arg; do
 	case ${arg} in
 	a)	ARCH="${OPTARG}" ;;
-	c)	NETCONF=true ;;
 	d)	DESCR="${OPTARG}" ;;
 	i)	IMGPATH="${OPTARG}" ;;
 	m)	MIRROR="${OPTARG}" ;;
@@ -413,8 +370,7 @@ fi
 
 ARCH=${ARCH:-amd64}
 CREATE_AMI=${CREATE_AMI:-true}
-IMGSIZE=${IMGSIZE:-10}
-NETCONF=${NETCONF:-false}
+IMGSIZE=${IMGSIZE:-12}
 RELEASE=${RELEASE:-snapshots}
 
 if [[ -z ${MIRROR} ]]; then
@@ -434,7 +390,7 @@ _BUCKETNAME=$(echo ${_IMGNAME} | tr '[:upper:]' '[:lower:]')-${RANDOM}
 DESCR=${DESCR:-${_IMGNAME}}
 
 readonly _BUCKETNAME _IMGNAME _TS _WRKDIR HTTP_PROXY HTTPS_PROXY
-readonly CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR NETCONF RELEASE
+readonly CREATE_AMI DESCR IMGPATH IMGSIZE MIRROR RELEASE
 
 # requirements checks to build the RAW image
 if [[ ! -f ${IMGPATH} ]]; then
@@ -460,8 +416,6 @@ fi
 
 if [[ ! -f ${IMGPATH} ]]; then
 	setup_vmd
-	setup_pf
-	setup_forwarding
 	create_img
 fi
 
