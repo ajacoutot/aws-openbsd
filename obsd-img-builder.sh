@@ -213,8 +213,6 @@ create_install_site()
 	pr_title "creating install.site"
 
 	cat <<-'EOF' >>${_WRKDIR}/install.site
-	ftp -V -o /usr/local/libexec/ec2-init \
-		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
 	chown root:bin /usr/local/libexec/ec2-init
 	chmod 0555 /usr/local/libexec/ec2-init
 
@@ -265,9 +263,15 @@ create_install_site_disk()
 		_retrydl=false
 	done
 
+	pr_title "downloading ec2-init"
+	install -d ${_WRKDIR}/usr/local/libexec/
+	ftp -o ${_WRKDIR}/usr/local/libexec/ec2-init \
+		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
+
 	pr_title "storing siteXX.tgz into install_site disk"
 	cd ${_WRKDIR} && tar czf \
-		${_sitemnt}/${_rel}/${ARCH}/site${_relint}.tgz ./install.site
+		${_sitemnt}/${_rel}/${ARCH}/site${_relint}.tgz ./install.site \
+			./usr/local/libexec/ec2-init
 
 	umount ${_sitemnt}
 	vnconfig -u ${_vndev}
