@@ -47,7 +47,7 @@ create_ami() {
 	#aws ec2 import-image --description "${DESCR}" --disk-containers \
 	#	file://"${_WRKDIR}/containers.json"
 
-	_importsnapid=$(aws ec2 import-snapshot --description ${DESCR} \
+	_importsnapid=$(aws ec2 import-snapshot --description "${DESCR}" \
 		--disk-container file://"${_WRKDIR}/containers.json" \
 		--role-name ${_IMGNAME} --query "ImportTaskId" --output text)
 
