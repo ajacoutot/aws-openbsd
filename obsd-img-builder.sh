@@ -185,7 +185,7 @@ create_img()
 	ftp -MV -o ${_bsdrd} ${MIRROR}/${RELEASE}/${ARCH}/bsd.rd
 
 	# 6.9 onwards uses a compressed rd file
-	if [[ $(file -bi ${_bsdrd}) == "application/x-executable" ]]; then
+	if [[ $(file -bi ${_bsdrd}) == "application/x-gzip" ]]; then
 		mv ${_bsdrd} ${_bsdrd}.gz
 		gunzip ${_bsdrd}.gz
 		_rdgz=true
