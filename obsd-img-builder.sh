@@ -175,7 +175,7 @@ create_iam_role()
 create_img()
 {
 	local _bsdrd=${_WRKDIR}/bsd.rd _rdextract=${_WRKDIR}/bsd.rd.extract
-	local _rdmnt=${_WRKDIR}/rdmnt _vndev
+	local _rdgz=false _rdmnt=${_WRKDIR}/rdmnt _vndev
 
 	create_install_site_disk
 
@@ -183,6 +183,14 @@ create_img()
 
 	pr_title "creating modified bsd.rd for autoinstall"
 	ftp -MV -o ${_bsdrd} ${MIRROR}/${RELEASE}/${ARCH}/bsd.rd
+
+	# 6.9 onwards uses a compressed rd file
+	if [[ $(file -bi ${_bsdrd}) == "application/x-executable" ]]; then
+		mv ${_bsdrd} ${_bsdrd}.gz
+		gunzip ${_bsdrd}.gz
+		_rdgz=true
+	fi
+
 	rdsetroot -x ${_bsdrd} ${_rdextract}
 	_vndev=$(vnconfig ${_rdextract})
 	install -d ${_rdmnt}
@@ -191,6 +199,11 @@ create_img()
 	umount ${_rdmnt}
 	vnconfig -u ${_vndev}
 	rdsetroot ${_bsdrd} ${_rdextract}
+
+	if ${_rdgz}; then
+		gzip ${_bsdrd}
+		mv ${_bsdrd}.gz ${_bsdrd}
+	fi
 
 	pr_title "starting autoinstall inside vmm(4)"
 
