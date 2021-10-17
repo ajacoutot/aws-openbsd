@@ -101,7 +101,7 @@ mock_pf()
 	case ${1} in
 	open)
 		print -- \
-			"pass out proto tcp from any to 169.254.169.254 port www" |
+			"pass out proto tcp from egress to 169.254.169.254 port www" |
 			pfctl -f - ;;
 	close)
 		print -- "" | pfctl -f - ;;
