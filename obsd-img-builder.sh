@@ -18,7 +18,11 @@ set -e
 umask 022
 
 create_ami() {
-	local _arch=${ARCH} _importsnapid _snap
+	local _arch=${ARCH} _bucket_conf _importsnapid _snap
+	local _region=$(aws configure get region)
+
+	[[ ${_region} == us-east-1 ]] ||
+		_bucket_conf="--create-bucket-configuration LocationConstraint=${_region}"
 
 	! [[ ${_arch} == amd64 ]] || _arch=x86_64
 
@@ -26,9 +30,7 @@ create_ami() {
 	vmdktool -v ${IMGPATH}.vmdk ${IMGPATH}
 
 	pr_title "uploading image to S3"
-	aws s3api create-bucket --bucket ${_BUCKETNAME} \
-		--create-bucket-configuration \
-		LocationConstraint=$(aws configure get region)
+	aws s3api create-bucket --bucket ${_BUCKETNAME} ${_bucket_conf}
 	aws s3 cp ${IMGPATH}.vmdk s3://${_BUCKETNAME}
 
 	pr_title "converting VMDK to snapshot"
