@@ -1,7 +1,7 @@
 # AWS-OpenBSD
 
 AWS playground for OpenBSD kids.  
-Running whatever is in this repo will propably end up destroying a kitten factory.
+Running whatever is in this repo will probably end up destroying a kitten factory.
 
 ## Prerequisites for obsd-img-builder.sh (OpenBSD AMI builder)
 
@@ -48,8 +48,8 @@ different relinked kernel.
 #!/bin/sh
 
 case $1 in
-	3)      echo "!/sbin/dhclient -i routers $2" >/etc/hostname.$2
-		/bin/sh /etc/netstart $i
+	3)      echo '!/sbin/dhclient -i routers \$if' >/etc/hostname.$2
+		/bin/sh /etc/netstart $2
 		;;
 esac
 EOF
