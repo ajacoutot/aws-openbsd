@@ -6,7 +6,7 @@ Running whatever is in this repo will propably end up destroying a kitten factor
 ## Prerequisites for obsd-img-builder.sh (OpenBSD AMI builder)
 
 * shell access to OpenBSD current >6.5 with vmm(4) support and Internet access
-* 3GB of free space in ${TMPDIR}
+* 3.5GB of free space in ${TMPDIR}
 * *awscli* and *vmdktool* packages installed
 * AWS IAM user with enough permissions (AmazonEC2FullAccess, AmazonS3FullAccess, IAMFullAccess)
   * AWS environment variables properly set (when not use root's awscli configuration):
