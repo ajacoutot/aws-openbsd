@@ -32,7 +32,7 @@ cleanjunk()
 	rm -f /etc/{iked,isakmpd}/{local.pub,private/local.key} \
 		/etc/ssh/ssh_host_*
 	# remove dhcp client configuration and old leases
-	rm -f /etc/dhclient.conf /var/db/dhclient.leases.*
+	rm -f /etc/dhcpleased.conf /var/db/dhcpleased/*
 	# remove cruft from /tmp
 	rm -rf /tmp/{.[!.],}*
 	# reset entropy files

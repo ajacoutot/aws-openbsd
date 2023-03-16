@@ -231,10 +231,6 @@ create_install_site()
 	chown root:bin /usr/local/libexec/ec2-init
 	chmod 0555 /usr/local/libexec/ec2-init
 
-	# XXX we should leave "inet autoconf" as set by the installer but it
-	# seems dhcpleased doesn't play well with AWS+hostname.if(5) command
-	echo '!/sbin/dhclient \$if' >/etc/hostname.vio0
-
 	echo "!/usr/local/libexec/ec2-init" >>/etc/hostname.vio0
 	cp -p /etc/hostname.vio0 /etc/hostname.xnf0
 
