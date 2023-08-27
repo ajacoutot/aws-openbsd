@@ -19,10 +19,9 @@ umask 022
 
 create_ami() {
 	local _arch=${ARCH} _bucket_conf _importsnapid _snap
-	local _region=$(aws configure get region)
 
-	[[ ${_region} == us-east-1 ]] ||
-		_bucket_conf="--create-bucket-configuration LocationConstraint=${_region}"
+	[[ ${_AWS_REGION} == us-east-1 ]] ||
+		_bucket_conf="--create-bucket-configuration LocationConstraint=${_AWS_REGION}"
 
 	! [[ ${_arch} == amd64 ]] || _arch=x86_64
 
@@ -116,8 +115,8 @@ create_autoinstallconf()
 create_iam_role()
 {
 	pr_title "creating IAM role"
-	local _region=$(aws configure get region) _awsarn="aws" 
- 	[[ ${_region} != cn-north-1 ]] ||
+	local _awsarn="aws"
+	[[ ${_AWS_REGION} != cn-north-1 ]] ||
   		_awsarn="aws-cn"
 	cat <<-'EOF' >>${_WRKDIR}/trust-policy.json
 	{
@@ -250,9 +249,8 @@ create_install_site_disk()
 {
 	# XXX trap vnd and mount
 
-	local _rel _relint _retrydl=true _vndev
+	local _cnproxy _rel _relint _retrydl=true _vndev
 	local _siteimg=${_WRKDIR}/siteXX.img _sitemnt=${_WRKDIR}/siteXX
- 	local _region=$(aws configure get region) _cnproxy
 
 	[[ ${RELEASE} == snapshots ]] && _rel=$(uname -r) || _rel=${RELEASE}
 	_relint=${_rel%.*}${_rel#*.}
@@ -282,7 +280,7 @@ create_install_site_disk()
 	done
 
 	pr_title "downloading ec2-init"
- 	[[ ${_region} != cn-north-1 ]] || 
+	[[ ${_AWS_REGION} != cn-north-1 ]] || 
   		_cnproxy="https://ghproxy.com/"
 	install -d ${_WRKDIR}/usr/local/libexec/
 	ftp -o ${_WRKDIR}/usr/local/libexec/ec2-init \
@@ -440,6 +438,7 @@ if [[ ! -f ${IMGPATH} ]]; then
 fi
 
 if ${CREATE_AMI}; then
+	_AWS_REGION=$(aws configure get region)
 	create_iam_role
 	create_ami
 fi
