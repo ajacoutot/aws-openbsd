@@ -116,7 +116,9 @@ create_autoinstallconf()
 create_iam_role()
 {
 	pr_title "creating IAM role"
-
+	local _region=$(aws configure get region) _awsarn="aws" 
+ 	[[ ${_region} != cn-north-1 ]] ||
+  		_awsarn="aws-cn"
 	cat <<-'EOF' >>${_WRKDIR}/trust-policy.json
 	{
 	   "Version": "2012-10-17",
@@ -147,8 +149,8 @@ create_iam_role()
 	            "s3:ListBucket"
 	         ],
 	         "Resource":[
-	            "arn:aws:s3:::${_BUCKETNAME}",
-	            "arn:aws:s3:::${_BUCKETNAME}/*"
+	            "arn:${_awsarn}:s3:::${_BUCKETNAME}",
+	            "arn:${_awsarn}:s3:::${_BUCKETNAME}/*"
 	         ]
 	      },
 	      {
@@ -250,6 +252,7 @@ create_install_site_disk()
 
 	local _rel _relint _retrydl=true _vndev
 	local _siteimg=${_WRKDIR}/siteXX.img _sitemnt=${_WRKDIR}/siteXX
+ 	local _region=$(aws configure get region) _cnproxy
 
 	[[ ${RELEASE} == snapshots ]] && _rel=$(uname -r) || _rel=${RELEASE}
 	_relint=${_rel%.*}${_rel#*.}
@@ -279,9 +282,11 @@ create_install_site_disk()
 	done
 
 	pr_title "downloading ec2-init"
+ 	[[ ${_region} != cn-north-1 ]] || 
+  		_cnproxy="https://ghproxy.com/"
 	install -d ${_WRKDIR}/usr/local/libexec/
 	ftp -o ${_WRKDIR}/usr/local/libexec/ec2-init \
-		https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
+		${_cnproxy}https://raw.githubusercontent.com/ajacoutot/aws-openbsd/master/ec2-init.sh
 
 	pr_title "storing siteXX.tgz into install_site disk"
 	cd ${_WRKDIR} && tar czf \
